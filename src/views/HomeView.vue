@@ -34,6 +34,13 @@
             <p style="margin-top: 1rem; color: var(--text-muted)">Loading sessions...</p>
         </div>
 
+        <!-- Empty State (No Active Sessions) -->
+        <div v-else-if="sortedCourses.length === 0" class="glass" style="text-align: center; padding: 3rem">
+            <i class="fas fa-calendar-times" style="font-size: 3rem; color: var(--text-muted); margin-bottom: 1rem; display: block;"></i>
+            <p style="color: var(--text-muted); font-size: 1.1rem;">No active sessions available at the moment.</p>
+            <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.5rem;">Please check back later or contact the coach.</p>
+        </div>
+
         <div v-else class="course-list" style="display: grid; gap: 2rem">
             <div v-for="course in sortedCourses" :key="course.id" class="glass course-card">
                 <div class="course-header" style="margin-bottom: 1.5rem">
