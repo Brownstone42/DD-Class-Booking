@@ -65,9 +65,9 @@
                                 margin-bottom: 1rem;
                             "
                         >
-                            <h3 style="font-size: 1.1rem">Time Slots, Pricing & Logic</h3>
+                            <h3 style="font-size: 1.1rem">Time Slots</h3>
                             <button @click="addSlot" class="btn btn-outline" style="padding: 0.5rem 1rem">
-                                <i class="fas fa-plus"></i> Add Slot
+                                <i class="fas fa-plus"></i> Slot
                             </button>
                         </div>
 
@@ -129,7 +129,7 @@
                                 </div>
                             </div>
                             <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.5rem">
-                                *Slots with the same Conflict Group cannot be booked together.
+                                *Slots with the same group cannot be booked together.
                             </p>
 
                             <button
