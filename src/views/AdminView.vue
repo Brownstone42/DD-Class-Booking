@@ -119,7 +119,7 @@
                                     <input type="number" v-model="slot.price" min="0" />
                                 </div>
                                 <div class="form-group">
-                                    <label>Conflict Group</label>
+                                    <label>Group</label>
                                     <input
                                         type="text"
                                         v-model="slot.group"
