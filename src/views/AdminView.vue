@@ -187,15 +187,35 @@
                         />
                     </div>
 
-                    <button
-                        @click="saveSession"
-                        class="btn btn-primary"
-                        :disabled="saving"
-                        style="width: 100%; padding: 1.2rem"
-                    >
-                        <i v-if="saving" class="loader-sm"></i>
-                        <span v-else>Create Session</span>
-                    </button>
+                    <div v-if="!editingId">
+                        <button
+                            @click="saveSession"
+                            class="btn btn-primary"
+                            :disabled="saving"
+                            style="width: 100%; padding: 1.2rem"
+                        >
+                            <i v-if="saving" class="loader-sm"></i>
+                            <span v-else>Create Session</span>
+                        </button>
+                    </div>
+                    <div v-else style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem">
+                        <button
+                            @click="$router.push('/')"
+                            class="btn btn-outline"
+                            style="padding: 1.2rem"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            @click="updateSession"
+                            class="btn btn-primary"
+                            :disabled="saving"
+                            style="padding: 1.2rem"
+                        >
+                            <i v-if="saving" class="loader-sm"></i>
+                            <span v-else>Update Session</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -207,7 +227,7 @@ import { VueDatePicker } from '@vuepic/vue-datepicker'
 import '@vuepic/vue-datepicker/dist/main.css'
 import { auth, db } from '../firebase'
 import { onAuthStateChanged } from 'firebase/auth'
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
+import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, getDoc, updateDoc } from 'firebase/firestore'
 
 export default {
     name: 'AdminView',
@@ -218,6 +238,7 @@ export default {
             authChecked: false,
             adminEmails: ['anawatbooch@gmail.com', 'wow0873233650@gmail.com'],
             saving: false,
+            editingId: null,
             form: {
                 title: '',
                 date: null,
@@ -240,11 +261,17 @@ export default {
             return this.user && this.adminEmails.includes(this.user.email)
         },
     },
-    created() {
+    async created() {
         onAuthStateChanged(auth, (user) => {
             this.user = user
             this.authChecked = true
         })
+
+        const editId = this.$route.query.edit
+        if (editId) {
+            this.editingId = editId
+            await this.loadSession(editId)
+        }
     },
     methods: {
         addSlot() {
@@ -260,19 +287,130 @@ export default {
         removeSlot(index) {
             this.form.slots.splice(index, 1)
         },
-        async saveSession() {
-            console.log('Form data:', this.form)
-
-            if (!this.form.title || !this.form.date || !this.form.registrationOpenAt || this.form.slots.length === 0) {
-                alert('Please fill in all general fields and at least one slot')
+        async loadSession(id) {
+            try {
+                const docRef = doc(db, 'courses', id)
+                const docSnap = await getDoc(docRef)
+                if (docSnap.exists()) {
+                    const data = docSnap.data()
+                    this.form = {
+                        title: data.title,
+                        date: new Date(data.date),
+                        registrationOpenAt: data.registrationOpenAt.toDate(),
+                        slots: data.slots.map(s => ({
+                            startTime: this.parseTime(s.startTime),
+                            endTime: this.parseTime(s.endTime),
+                            capacity: s.capacity,
+                            price: s.price,
+                            group: s.group,
+                            isActive: s.isActive
+                        }))
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading session:', error)
+                alert('Failed to load session data')
+            }
+        },
+        parseTime(timeStr) {
+            const [hours, minutes] = timeStr.split(':').map(Number)
+            return { hours, minutes }
+        },
+        async updateSession() {
+            if (!this.form.title || !this.form.date || !this.form.registrationOpenAt) {
+                alert('Please fill all required fields.')
                 return
             }
 
             this.saving = true
             try {
-                // Parse date
-                const d = new Date(this.form.date)
-                const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+                const dateObj = new Date(this.form.date)
+                const dateStr = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`
+
+                const processedSlots = this.form.slots.map((slot, idx) => {
+                    const formatTime = (t) => {
+                        if (t instanceof Date) {
+                            return `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`
+                        } else if (t && typeof t === 'object' && 'hours' in t) {
+                            return `${String(t.hours).padStart(2, '0')}:${String(t.minutes).padStart(2, '0')}`
+                        }
+                        return t // fallback
+                    }
+
+                    // Keep existing ID and data if editing, or create new
+                    // Wait, we should probably keep the ID if we are editing.
+                    // But processing them again is fine as long as we match the structure.
+                    // However, we must preserve attendees/waitlist!
+                    
+                    return {
+                        ...slot,
+                        startTime: formatTime(slot.startTime),
+                        endTime: formatTime(slot.endTime),
+                        capacity: parseInt(slot.capacity),
+                        price: parseFloat(slot.price),
+                        group: slot.group ? slot.group.toUpperCase() : '',
+                    }
+                })
+
+                // When updating, we must NOT overwrite attendees/waitlist.
+                // So we need to fetch the current doc again to merge or use transactional update.
+                // For simplicity here, let's fetch current slots first.
+                const docRef = doc(db, 'courses', this.editingId)
+                const currentDoc = await getDoc(docRef)
+                const currentSlots = currentDoc.data().slots
+
+                const finalSlots = processedSlots.map((newSlot, idx) => {
+                    const existingSlot = currentSlots[idx] 
+                    return {
+                        ...newSlot,
+                        id: existingSlot ? existingSlot.id : `slot_${Date.now()}_${idx}`,
+                        attendees: existingSlot ? existingSlot.attendees : [],
+                        waitlist: existingSlot ? existingSlot.waitlist : [],
+                        isActive: newSlot.isActive !== undefined ? newSlot.isActive : true
+                    }
+                })
+
+                await updateDoc(docRef, {
+                    title: this.form.title,
+                    date: dateStr,
+                    slots: finalSlots,
+                    registrationOpenAt: new Date(this.form.registrationOpenAt),
+                })
+
+                alert('Session updated successfully!')
+                this.$router.push('/')
+            } catch (error) {
+                console.error('Error updating session:', error)
+                alert('Failed to update session: ' + error.message)
+            } finally {
+                this.saving = false
+            }
+        },
+        async saveSession() {
+            if (!this.form.title || !this.form.date || !this.form.registrationOpenAt) {
+                alert('Please fill all required fields.')
+                return
+            }
+
+            this.saving = true
+            try {
+                // Formatting date for comparison
+                const dateObj = new Date(this.form.date)
+                const dateStr = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`
+
+                // --- NEW: Duplicate Date Check ---
+                const q = query(
+                    collection(db, 'courses'),
+                    where('date', '==', dateStr),
+                    where('isTerminated', '==', false)
+                )
+                const querySnapshot = await getDocs(q)
+                if (!querySnapshot.empty) {
+                    alert(`Error: A session for ${dateStr} already exists and is active. Please terminate it before creating a new one.`)
+                    this.saving = false
+                    return
+                }
+                // ----------------------------------
 
                 // Process Slots
                 const processedSlots = this.form.slots.map((slot, idx) => {
@@ -308,23 +446,8 @@ export default {
                     createdBy: this.user.email,
                 })
 
-                alert('Session created successfully with conflict logic!')
-                // Reset form
-                this.form = {
-                    title: '',
-                    date: null,
-                    slots: [
-                        {
-                            startTime: { hours: 18, minutes: 0 },
-                            endTime: { hours: 20, minutes: 0 },
-                            capacity: 8,
-                            price: 300,
-                            group: '',
-                            isActive: true,
-                        },
-                    ],
-                    registrationOpenAt: null,
-                }
+                alert('Session created successfully!')
+                this.$router.push('/')
             } catch (error) {
                 console.error('Error saving session:', error)
                 alert('Failed to save session: ' + error.message)

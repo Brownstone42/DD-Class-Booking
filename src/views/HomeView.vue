@@ -56,8 +56,13 @@
                                 </p>
                             </div>
                         </div>
-                        <div class="reg-status" :class="getRegistrationStatus(course).class">
-                            {{ getRegistrationStatus(course).label }}
+                        <div style="display: flex; align-items: center; gap: 0.5rem">
+                            <button v-if="isAdmin" @click="editSession(course.id)" class="btn btn-outline" style="padding: 4px 8px; font-size: 0.7rem; border-color: var(--primary); color: var(--primary);">
+                                <i class="fas fa-edit"></i> Edit
+                            </button>
+                            <div class="reg-status" :class="getRegistrationStatus(course).class">
+                                {{ getRegistrationStatus(course).label }}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -121,7 +126,7 @@
                                             <span v-else-if="isConflicting(course, slot)">Conflict</span>
                                             <span v-else-if="isRegistrationClosed(course)">Upcoming</span>
                                             <span v-else-if="slot.attendees.length < slot.capacity">Join</span>
-                                            <span v-else>Waitlist</span>
+                                            <span v-else>Join</span>
                                         </button>
                                     </div>
                                 </div>
@@ -182,7 +187,7 @@
 <script>
 import { auth, db } from '../firebase'
 import { onAuthStateChanged } from 'firebase/auth'
-import { collection, query, onSnapshot, doc, updateDoc, runTransaction } from 'firebase/firestore'
+import { collection, query, onSnapshot, doc, updateDoc, runTransaction, where } from 'firebase/firestore'
 
 export default {
     name: 'HomeView',
@@ -223,7 +228,7 @@ export default {
     },
     created() {
         onAuthStateChanged(auth, (user) => { this.user = user })
-        onSnapshot(query(collection(db, 'courses')), (snapshot) => {
+        onSnapshot(query(collection(db, 'courses'), where('isTerminated', '==', false)), (snapshot) => {
             this.courses = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
             this.loading = false
         })
@@ -236,6 +241,9 @@ export default {
         },
         isExpanded(slotId) {
             return this.expandedSlots.includes(slotId)
+        },
+        editSession(id) {
+            this.$router.push({ name: 'admin', query: { edit: id } })
         },
         formatDate(dateStr) {
             if (!dateStr) return ''
