@@ -48,7 +48,6 @@
             <div v-if="!session.isTerminated && hasMoreTiers" class="bg-primary/5 border border-primary rounded-2xl p-5 mb-6 flex items-center justify-between gap-4 flex-wrap">
                 <div>
                     <p class="font-bold text-primary">Ready to open Tier {{ session.activeTier + 1 }}?</p>
-                    <p class="text-sm text-muted mt-0.5">This will promote eligible waitlisted users automatically.</p>
                 </div>
                 <button
                     @click="openNextTier"
@@ -503,7 +502,28 @@ export default {
 
         async openNextTier() {
             const newTier = this.session.activeTier + 1
-            if (!confirm(`Open Tier ${newTier}? This will auto-generate blocks and promote eligible waitlisted users.`)) return
+
+            // Pre-simulate using live session data to build an accurate confirm message
+            const s = this.session
+            let previewBlocks = []
+            if (newTier === 2) {
+                const { blocks } = generateTier2Blocks(s.slots, s.bookings || [])
+                previewBlocks = blocks
+            } else if (newTier === 3) {
+                const tier2 = (s.tiers || []).find((t) => t.tier === 2)
+                const consumed = getConsumedIndicesFromTier2(s.slots, tier2?.blocks || [])
+                previewBlocks = generateTier3Blocks(s.slots, s.bookings || [], consumed)
+            }
+            const previewTiers = [
+                ...(s.tiers || []).filter((t) => t.tier !== newTier),
+                { tier: newTier, blocks: previewBlocks },
+            ]
+            const previewPromos = findAllPromotions({ ...s, activeTier: newTier, tiers: previewTiers })
+            const blockWord = previewBlocks.length === 1 ? 'block' : 'blocks'
+            const promoLine = previewPromos.length > 0
+                ? ` ${previewPromos.length} waitlisted booking${previewPromos.length !== 1 ? 's' : ''} will be promoted.`
+                : ''
+            if (!confirm(`Open Tier ${newTier}? ${previewBlocks.length} ${blockWord} will be generated.${promoLine}`)) return
             this.processing = true
             try {
                 const sessionRef = doc(db, 'sessions', this.session.id)

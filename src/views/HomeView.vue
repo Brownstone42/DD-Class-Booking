@@ -112,13 +112,16 @@
                                         <span v-else class="text-[0.6rem] mt-0.5 opacity-60">{{ slotRemaining(session, si) }} left</span>
                                     </button>
                                 </div>
-                                <p class="text-xs text-muted mb-3">Fixed <span class="text-blue-400">must-have</span> slots are preset. Tap available slots to add as <span class="text-amber-400">preferred</span>.</p>
+                                <p class="text-xs text-muted mb-3">Tap available slots to set as <span class="text-blue-400">must-have</span> or <span class="text-amber-400">preferred</span>. Green slots are fixed by the coach.</p>
                                 <div class="flex gap-4 flex-wrap text-xs text-muted mb-5">
                                     <span class="flex items-center gap-1.5">
-                                        <span class="w-3 h-3 rounded bg-blue-500 inline-block"></span> Must have (fixed)
+                                        <span class="w-3 h-3 rounded bg-green-600 inline-block"></span> Fixed (coach)
                                     </span>
                                     <span class="flex items-center gap-1.5">
-                                        <span class="w-3 h-3 rounded bg-amber-400 inline-block"></span> Prefer to extend
+                                        <span class="w-3 h-3 rounded bg-blue-500 inline-block"></span> Must have
+                                    </span>
+                                    <span class="flex items-center gap-1.5">
+                                        <span class="w-3 h-3 rounded bg-amber-400 inline-block"></span> Preferred
                                     </span>
                                 </div>
                                 <div v-if="user && selectionInfo(session)" class="bg-white/[0.05] border border-white/10 rounded-xl p-4">
@@ -131,14 +134,17 @@
                                                     class="text-muted text-sm font-normal ml-1"
                                                 >(must: {{ selectionInfo(session).blueStart }}–{{ selectionInfo(session).blueEnd }})</span>
                                             </p>
-                                            <p class="text-sm text-muted mt-0.5">
+                                            <p v-if="!selectionInfo(session).error" class="text-sm text-muted mt-0.5">
                                                 Tier {{ selectionInfo(session).tier }}
                                                 &middot; up to ฿{{ selectionInfo(session).maxPrice }}
+                                            </p>
+                                            <p v-else class="text-xs text-error mt-1">
+                                                <i class="fas fa-exclamation-circle mr-1"></i>{{ selectionInfo(session).error }}
                                             </p>
                                         </div>
                                         <button
                                             @click="book(session)"
-                                            :disabled="booking === session.id"
+                                            :disabled="booking === session.id || !!selectionInfo(session).error"
                                             class="bg-primary text-black font-bold px-6 py-2.5 rounded-xl hover:-translate-y-0.5 hover:shadow-[0_8px_20px_rgba(192,255,0,0.3)] transition-all cursor-pointer border-none disabled:opacity-60 disabled:cursor-not-allowed flex-shrink-0"
                                         >
                                             <span v-if="booking === session.id">
@@ -359,25 +365,9 @@ export default {
             if (this.isFixedTile(session, slotIndex)) return
             if (!this.isExtendableTile(session, slotIndex)) return
             const sel = [...(this.tileSelections[sessionId] || Array(session.slots.length).fill('none'))]
-            const next = sel[slotIndex] === 'none' ? 'yellow' : 'none'
-            const proposed = [...sel]
-            proposed[slotIndex] = next
-            if (this.isValidTier1Selection(proposed, session)) {
-                this.tileSelections[sessionId] = proposed
-            }
-        },
-        isValidTier1Selection(sel, session) {
-            const t1 = (session.tiers || []).find((t) => t.tier === 1)
-            const all = sel.map((s, i) => (s !== 'none' ? i : -1)).filter((i) => i >= 0)
-            if (all.length === 0) return true
-            const allMin = Math.min(...all)
-            const allMax = Math.max(...all)
-            if (allMax - allMin + 1 !== all.length) return false
-            const rangeStart = session.slots[allMin].startTime
-            const rangeEnd = session.slots[allMax].endTime
-            if (!t1) return true
-            if (rangeStart === t1.fixedStart && rangeEnd === t1.fixedEnd) return true
-            return (t1.blocks || []).some((b) => b.start === rangeStart && b.end === rangeEnd)
+            const cur = sel[slotIndex] || 'none'
+            sel[slotIndex] = cur === 'none' ? 'blue' : cur === 'blue' ? 'yellow' : 'none'
+            this.tileSelections[sessionId] = sel
         },
         selectionInfo(session) {
             if (session.activeTier !== 1) return null
@@ -387,25 +377,41 @@ export default {
             if (!t1?.fixedStart || !t1?.fixedEnd) return null
             const all = sel.map((s, i) => (s !== 'none' ? i : -1)).filter((i) => i >= 0)
             if (all.length === 0) return null
-            const yellowStart = session.slots[Math.min(...all)].startTime
-            const yellowEnd = session.slots[Math.max(...all)].endTime
-            const maxPrice = calcBlockPrice(session.slots, yellowStart, yellowEnd)
-            return {
-                blueStart: t1.fixedStart,
-                blueEnd: t1.fixedEnd,
-                yellowStart,
-                yellowEnd,
-                tier: 1,
-                maxPrice,
+
+            const allMin = Math.min(...all)
+            const allMax = Math.max(...all)
+            const yellowStart = session.slots[allMin].startTime
+            const yellowEnd = session.slots[allMax].endTime
+            const blues = sel.map((s, i) => (s === 'blue' ? i : -1)).filter((i) => i >= 0)
+            const blueStart = blues.length > 0 ? session.slots[Math.min(...blues)].startTime : t1.fixedStart
+            const blueEnd = blues.length > 0 ? session.slots[Math.max(...blues)].endTime : t1.fixedEnd
+
+            let error = null
+            if (allMax - allMin + 1 !== all.length) {
+                error = 'Selected slots must be contiguous.'
+            } else if (blues.length > 1) {
+                const blueMin = Math.min(...blues)
+                const blueMax = Math.max(...blues)
+                if (blueMax - blueMin + 1 !== blues.length) error = 'Must-have slots must be contiguous.'
             }
+            if (!error && !(t1.blocks || []).some((b) => b.start === yellowStart && b.end === yellowEnd)) {
+                error = 'Time range not in allowed blocks.'
+            }
+
+            const maxPrice = error ? 0 : calcBlockPrice(session.slots, yellowStart, yellowEnd)
+            return { blueStart, blueEnd, yellowStart, yellowEnd, tier: 1, maxPrice, error }
         },
         tileClass(sessionId, slotIndex, session) {
             const base = 'flex flex-col items-center justify-center w-20 h-20 rounded-xl border transition-all'
             if (this.isFixedTile(session, slotIndex)) {
-                return `${base} bg-blue-500 border-blue-400 text-white cursor-default`
+                return `${base} bg-green-600 border-green-500 text-white cursor-default`
             }
             const sel = this.tileSelections[sessionId] || []
-            if ((sel[slotIndex] || 'none') === 'yellow') {
+            const state = sel[slotIndex] || 'none'
+            if (state === 'blue') {
+                return `${base} bg-blue-500 border-blue-400 text-white cursor-pointer`
+            }
+            if (state === 'yellow') {
                 return `${base} bg-amber-400 border-amber-300 text-black cursor-pointer`
             }
             if (!this.user || !this.isExtendableTile(session, slotIndex)) {
@@ -489,7 +495,7 @@ export default {
 
         async book(session) {
             const info = this.selectionInfo(session)
-            if (!info) return
+            if (!info || info.error) return
             this.booking = session.id
             try {
                 const sessionRef = doc(db, 'sessions', session.id)
