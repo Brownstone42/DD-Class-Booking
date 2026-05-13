@@ -1,376 +1,152 @@
 <template>
     <div class="fade-in">
-        <!-- Hero -->
-        <header class="mb-8 text-center">
-            <h1 class="text-4xl md:text-5xl font-bold mb-2">Tennis Class Booking</h1>
-            <p class="text-muted">Select your session and join the game.</p>
-        </header>
-
-        <!-- My Active Bookings -->
-        <section v-if="user && myBookings.length > 0" class="mb-12">
-            <div
-                class="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6 border-l-4 border-l-primary"
-            >
-                <h3 class="font-bold text-lg mb-4">
-                    <i class="fas fa-calendar-check mr-2"></i> My Active Bookings
-                </h3>
-                <div class="grid gap-3">
-                    <div
-                        v-for="item in myBookings"
-                        :key="item.slot.id"
-                        class="flex justify-between items-center bg-white/5 px-4 py-3 rounded-xl"
-                    >
-                        <div>
-                            <div class="font-bold">{{ item.courseTitle }}</div>
-                            <div class="text-sm text-muted mt-0.5">
-                                {{ formatDate(item.courseDate) }} | {{ item.slot.startTime }} –
-                                {{ item.slot.endTime }}
-                            </div>
-                            <div
-                                class="text-xs font-semibold mt-1"
-                                :class="
-                                    item.type === 'attendee' ? 'text-success' : 'text-warning'
-                                "
-                            >
-                                {{
-                                    item.type === 'attendee'
-                                        ? '● Confirmed'
-                                        : '● Waitlisted #' + item.queuePos
-                                }}
-                            </div>
-                        </div>
-                        <button
-                            @click="handleCancel(item.courseId, item.slot)"
-                            class="text-sm px-4 py-2 rounded-xl border border-error text-error bg-transparent hover:bg-error/10 transition-colors cursor-pointer"
-                        >
-                            Cancel
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </section>
-
         <!-- Loading -->
-        <div
-            v-if="loading"
-            class="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-12 text-center"
-        >
-            <div
-                class="w-6 h-6 rounded-full border-2 border-white/10 border-t-primary animate-spin mx-auto"
-            ></div>
-            <p class="mt-4 text-muted">Loading sessions...</p>
+        <div v-if="!authChecked || sessionsLoading" class="text-center py-12 text-muted">
+            <div class="w-6 h-6 rounded-full border-2 border-white/10 border-t-primary animate-spin mx-auto mb-4"></div>
+            Loading...
         </div>
 
-        <!-- Empty state -->
-        <div
-            v-else-if="sortedCourses.length === 0"
-            class="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-12 text-center"
-        >
-            <i class="fas fa-calendar-times block text-5xl text-muted mb-4"></i>
-            <p class="text-muted text-lg">No active sessions available at the moment.</p>
-            <p class="text-muted text-sm mt-2">Please check back later or contact the coach.</p>
-        </div>
+        <div v-else>
+            <header class="mb-8">
+                <h1 class="text-3xl font-bold">Book a Session</h1>
+                <p class="text-muted mt-1">Select your preferred time slots below.</p>
+            </header>
 
-        <!-- Course list -->
-        <div v-else class="grid gap-8">
-            <div
-                v-for="course in sortedCourses"
-                :key="course.id"
-                class="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6 md:p-8"
-            >
-                <!-- Course header -->
-                <div class="mb-6">
-                    <div class="flex justify-between items-start gap-4">
+            <div v-if="activeSessions.length === 0" class="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-12 text-center text-muted">
+                No sessions available right now.
+            </div>
+
+            <div v-else class="grid gap-8">
+                <div
+                    v-for="session in activeSessions"
+                    :key="session.id"
+                    class="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6 md:p-8"
+                >
+                    <!-- Session header -->
+                    <div class="flex items-start justify-between gap-4 flex-wrap mb-6">
                         <div>
-                            <h2 class="text-2xl font-bold text-primary">{{ course.title }}</h2>
-                            <div class="flex items-center gap-3 flex-wrap mt-2">
-                                <p class="text-lg font-semibold">
-                                    <i class="far fa-calendar-alt mr-1"></i>
-                                    {{ formatDate(course.date) }}
-                                </p>
-                                <span
-                                    v-if="
-                                        isRegistrationClosed(course) && !allSlotsClosed(course)
-                                    "
-                                    class="text-sm text-warning bg-warning/10 px-2 py-0.5 rounded"
-                                >
-                                    <i class="far fa-clock mr-1"></i> Estimate Open:
-                                    {{ estimateOpenTime(course.registrationOpenAt) }}
-                                </span>
+                            <h2 class="text-xl font-bold">{{ session.title }}</h2>
+                            <p class="text-muted text-sm mt-1">
+                                {{ formatDate(session.date) }} &middot; {{ session.startTime }}–{{ session.endTime }}
+                            </p>
+                        </div>
+                        <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-primary/10 text-primary border border-primary/20 self-start">
+                            Tier {{ session.activeTier }} Open
+                        </span>
+                    </div>
+
+                    <!-- Registration not open yet -->
+                    <div
+                        v-if="!isRegistrationOpen(session)"
+                        class="text-center py-6 text-muted text-sm bg-white/[0.03] rounded-xl border border-white/10"
+                    >
+                        <i class="fas fa-clock text-2xl mb-2 block"></i>
+                        Registration opens {{ formatDateTime(session.registrationOpenAt) }}
+                    </div>
+
+                    <!-- User's existing booking -->
+                    <div v-else-if="userBooking(session)">
+                        <div
+                            :class="[
+                                'rounded-xl p-5 border',
+                                userBooking(session).status === 'confirmed'
+                                    ? 'bg-success/5 border-success/30'
+                                    : 'bg-warning/5 border-warning/30'
+                            ]"
+                        >
+                            <div class="flex items-start justify-between gap-4 flex-wrap">
+                                <div>
+                                    <p :class="['font-bold', userBooking(session).status === 'confirmed' ? 'text-success' : 'text-warning']">
+                                        {{ userBooking(session).status === 'confirmed' ? 'Booking Confirmed' : 'On Waitlist' }}
+                                    </p>
+                                    <p class="text-sm text-muted mt-1" v-if="userBooking(session).status === 'confirmed'">
+                                        {{ userBooking(session).confirmedStart }}–{{ userBooking(session).confirmedEnd }}
+                                        &middot; ฿{{ bookingPrice(session, userBooking(session)) }}
+                                        <span :class="['ml-2 text-xs px-2 py-0.5 rounded-full', userBooking(session).isPaid ? 'text-success bg-success/10' : 'text-warning bg-warning/10']">
+                                            {{ userBooking(session).isPaid ? 'Paid' : 'Unpaid' }}
+                                        </span>
+                                    </p>
+                                    <p class="text-sm text-muted mt-1" v-else>
+                                        Preferred: {{ userBooking(session).yellowStart }}–{{ userBooking(session).yellowEnd }}
+                                        <span v-if="userBooking(session).blueStart !== userBooking(session).yellowStart || userBooking(session).blueEnd !== userBooking(session).yellowEnd">
+                                            &middot; must: {{ userBooking(session).blueStart }}–{{ userBooking(session).blueEnd }}
+                                        </span>
+                                        &middot; Tier {{ userBooking(session).preferredTier }}
+                                    </p>
+                                </div>
+                                <button
+                                    @click="cancelBooking(session)"
+                                    :disabled="cancelling === session.id"
+                                    class="text-sm px-4 py-2 rounded-xl border border-error/30 text-error hover:bg-error/10 transition-colors cursor-pointer bg-transparent disabled:opacity-50"
+                                >Cancel</button>
                             </div>
                         </div>
-                        <div class="flex items-center gap-2 shrink-0">
+                    </div>
+
+                    <!-- Tile selection -->
+                    <div v-else>
+                        <!-- Login prompt -->
+                        <div v-if="!user" class="text-center py-6 text-muted text-sm bg-white/[0.03] rounded-xl border border-white/10 mb-4">
+                            <i class="fas fa-lock text-xl mb-2 block"></i>
+                            Log in to book a slot.
+                        </div>
+
+                        <!-- Tiles -->
+                        <div class="flex flex-wrap gap-2 mb-4">
                             <button
-                                v-if="isAdmin"
-                                @click="editSession(course.id)"
-                                class="inline-flex items-center gap-1 border border-primary text-primary text-xs px-2 py-1 rounded-lg hover:bg-primary/10 transition-colors cursor-pointer bg-transparent"
+                                v-for="(slot, si) in session.slots"
+                                :key="si"
+                                @click="user && handleTileClick(session.id, si, session)"
+                                :class="tileClass(session.id, si, session)"
+                                :disabled="!user"
                             >
-                                <i class="fas fa-edit"></i> Edit
+                                <span class="font-mono font-semibold text-sm">{{ slot.startTime }}</span>
+                                <span class="text-xs mt-0.5 opacity-80">฿{{ slot.price }}</span>
+                                <span v-if="slotIsFull(session, si)" class="text-[0.6rem] mt-0.5 opacity-60">FULL</span>
+                                <span v-else class="text-[0.6rem] mt-0.5 opacity-60">{{ slotRemaining(session, si) }} left</span>
                             </button>
-                            <span
-                                :class="[
-                                    'px-3 py-0.5 rounded-full text-xs font-bold',
-                                    getRegistrationStatus(course).class === 'upcoming'
-                                        ? 'bg-warning/20 text-warning'
-                                        : getRegistrationStatus(course).class === 'open'
-                                          ? 'bg-success/20 text-success'
-                                          : 'bg-error/20 text-error',
-                                ]"
-                            >
-                                {{ getRegistrationStatus(course).label }}
+                        </div>
+
+                        <!-- Legend -->
+                        <div class="flex gap-4 flex-wrap text-xs text-muted mb-5">
+                            <span class="flex items-center gap-1.5">
+                                <span class="w-3 h-3 rounded bg-blue-500 inline-block"></span> Must have
+                            </span>
+                            <span class="flex items-center gap-1.5">
+                                <span class="w-3 h-3 rounded bg-amber-400 inline-block"></span> Prefer but optional
                             </span>
                         </div>
-                    </div>
-                </div>
 
-                <!-- Slots -->
-                <div class="grid gap-3">
-                    <div v-for="slot in course.slots" :key="slot.id">
-                        <div
-                            class="bg-white/[0.03] p-5 rounded-xl border border-white/10 transition-all"
-                        >
-                            <div
-                                class="flex justify-between items-center flex-wrap gap-4"
-                            >
-                                <!-- Slot info -->
-                                <div class="min-w-0">
-                                    <div class="text-xl font-bold">
-                                        {{ slot.startTime }} – {{ slot.endTime }}
-                                    </div>
-                                    <div class="text-primary font-semibold mt-0.5">
-                                        {{ slot.price }} THB
-                                    </div>
-
-                                    <!-- Clickable capacity row -->
-                                    <div
-                                        @click="toggleExpand(slot.id)"
-                                        class="cursor-pointer mt-1.5"
-                                    >
-                                        <div
-                                            class="flex items-center gap-1.5 text-sm text-muted"
-                                        >
-                                            <span
-                                                >Capacity:
-                                                {{ slot.attendees.length }}/{{
-                                                    slot.capacity
-                                                }}</span
-                                            >
-                                            <i
-                                                class="fas text-[0.7rem]"
-                                                :class="
-                                                    isExpanded(slot.id)
-                                                        ? 'fa-chevron-up'
-                                                        : 'fa-chevron-down'
-                                                "
-                                            ></i>
-                                        </div>
-                                        <div class="text-sm text-muted font-medium mt-0.5">
-                                            Waitlist: {{ slot.waitlist.length }}
-                                        </div>
-                                    </div>
-
-                                    <span
-                                        v-if="slot.group"
-                                        class="inline-block mt-1.5 text-[0.7rem] bg-white/10 px-1.5 py-0.5 rounded"
-                                        >Group: {{ slot.group }}</span
-                                    >
+                        <!-- Selection summary + book button -->
+                        <div v-if="user && selectionInfo(session)" class="bg-white/[0.05] border border-white/10 rounded-xl p-4">
+                            <div class="flex items-start justify-between gap-4 flex-wrap">
+                                <div>
+                                    <p class="font-semibold">
+                                        {{ selectionInfo(session).yellowStart }}–{{ selectionInfo(session).yellowEnd }}
+                                        <span
+                                            v-if="selectionInfo(session).blueStart !== selectionInfo(session).yellowStart || selectionInfo(session).blueEnd !== selectionInfo(session).yellowEnd"
+                                            class="text-muted text-sm font-normal ml-1"
+                                        >(must: {{ selectionInfo(session).blueStart }}–{{ selectionInfo(session).blueEnd }})</span>
+                                    </p>
+                                    <p class="text-sm text-muted mt-0.5">
+                                        Tier {{ selectionInfo(session).tier }}
+                                        &middot; up to ฿{{ selectionInfo(session).maxPrice }}
+                                    </p>
                                 </div>
-
-                                <!-- Actions -->
-                                <div class="flex gap-2 flex-wrap">
-                                    <!-- Admin: start/stop toggle -->
-                                    <div
-                                        v-if="isAdmin"
-                                        class="flex-none w-24 flex items-center justify-center"
-                                    >
-                                        <button
-                                            v-if="slot.isActive"
-                                            @click="toggleSlotStatus(course, slot)"
-                                            class="w-full py-2 text-sm font-semibold rounded-xl border border-error text-error bg-transparent hover:bg-error/10 transition-colors cursor-pointer"
-                                        >
-                                            <i class="fas fa-hand-paper mr-1"></i> Stop
-                                        </button>
-                                        <button
-                                            v-else
-                                            @click="toggleSlotStatus(course, slot)"
-                                            class="w-full py-2 text-sm font-semibold rounded-xl bg-primary text-black hover:shadow-[0_4px_15px_rgba(192,255,0,0.3)] transition-all cursor-pointer border-none"
-                                        >
-                                            <i class="fas fa-play mr-1"></i> Start
-                                        </button>
-                                    </div>
-
-                                    <!-- User: booking status / join button -->
-                                    <div class="flex-1 min-w-36">
-                                        <div
-                                            v-if="isUserInSlot(slot)"
-                                            class="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-success/10 text-success font-bold h-full text-sm"
-                                        >
-                                            <i class="fas fa-check-circle"></i> Enrolled
-                                        </div>
-                                        <div
-                                            v-else-if="isUserInWaitlist(slot)"
-                                            class="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-warning/10 text-warning font-bold h-full text-sm"
-                                        >
-                                            <i class="fas fa-clock"></i> Waitlisted
-                                        </div>
-                                        <button
-                                            v-else
-                                            @click="handleBooking(course, slot)"
-                                            :class="[
-                                                'w-full py-2 px-4 text-sm font-semibold rounded-xl inline-flex items-center justify-center gap-2 transition-all border-none',
-                                                isButtonDisabled(course, slot)
-                                                    ? 'bg-white/5 text-muted cursor-not-allowed'
-                                                    : 'bg-primary text-black cursor-pointer hover:-translate-y-0.5 hover:shadow-[0_6px_15px_rgba(192,255,0,0.3)]',
-                                            ]"
-                                            :disabled="isButtonDisabled(course, slot)"
-                                        >
-                                            <span v-if="!user">Login</span>
-                                            <span v-else-if="!slot.isActive">Closed</span>
-                                            <span v-else-if="isConflicting(course, slot)"
-                                                >Conflict</span
-                                            >
-                                            <span v-else-if="isRegistrationClosed(course)"
-                                                >Upcoming</span
-                                            >
-                                            <span v-else>Join</span>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Expandable attendee / waitlist list -->
-                            <transition name="slide">
-                                <div
-                                    v-if="isExpanded(slot.id)"
-                                    class="mt-6 pt-4 border-t border-white/10"
+                                <button
+                                    @click="book(session)"
+                                    :disabled="booking === session.id"
+                                    class="bg-primary text-black font-bold px-6 py-2.5 rounded-xl hover:-translate-y-0.5 hover:shadow-[0_8px_20px_rgba(192,255,0,0.3)] transition-all cursor-pointer border-none disabled:opacity-60 disabled:cursor-not-allowed flex-shrink-0"
                                 >
-                                    <div
-                                        v-if="
-                                            slot.attendees.length === 0 &&
-                                            slot.waitlist.length === 0
-                                        "
-                                        class="text-center text-muted text-sm py-4"
-                                    >
-                                        No one has joined yet.
-                                    </div>
-
-                                    <!-- Confirmed attendees -->
-                                    <div v-if="slot.attendees.length > 0" class="mb-4">
-                                        <h4
-                                            class="text-xs text-success uppercase tracking-widest font-semibold mb-3"
-                                        >
-                                            Confirmed Attendees
-                                        </h4>
-                                        <div
-                                            class="grid gap-2"
-                                            style="
-                                                grid-template-columns: repeat(
-                                                    auto-fill,
-                                                    minmax(140px, 1fr)
-                                                );
-                                            "
-                                        >
-                                            <div
-                                                v-for="person in slot.attendees"
-                                                :key="person.email"
-                                                :class="[
-                                                    'flex items-center gap-2 bg-white/5 px-3 py-1.5 rounded-full border transition-colors',
-                                                    person.isPaid
-                                                        ? 'border-success/30 bg-success/5'
-                                                        : 'border-white/10',
-                                                ]"
-                                            >
-                                                <img
-                                                    :src="
-                                                        person.photoURL ||
-                                                        'https://ui-avatars.com/api/?name=' +
-                                                            person.displayName
-                                                    "
-                                                    class="w-6 h-6 rounded-full object-cover shrink-0"
-                                                />
-                                                <span
-                                                    class="text-sm truncate max-w-[90px] min-w-0"
-                                                    >{{
-                                                        person.displayName ||
-                                                        person.email.split('@')[0]
-                                                    }}</span
-                                                >
-                                                <button
-                                                    v-if="isAdmin"
-                                                    @click.stop="
-                                                        togglePaymentStatus(
-                                                            course,
-                                                            slot,
-                                                            person,
-                                                        )
-                                                    "
-                                                    :class="[
-                                                        'bg-transparent border-none p-0.5 cursor-pointer transition-colors text-xs shrink-0',
-                                                        person.isPaid
-                                                            ? 'text-success'
-                                                            : 'text-muted hover:text-primary',
-                                                    ]"
-                                                    title="Toggle payment"
-                                                >
-                                                    <i class="fas fa-money-bill-wave"></i>
-                                                </button>
-                                                <i
-                                                    v-else-if="person.isPaid"
-                                                    class="fas fa-check-circle text-success text-xs shrink-0"
-                                                ></i>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- Waitlist -->
-                                    <div v-if="slot.waitlist.length > 0">
-                                        <h4
-                                            class="text-xs text-warning uppercase tracking-widest font-semibold mb-3"
-                                        >
-                                            Waitlist Queue
-                                        </h4>
-                                        <div class="grid gap-1.5">
-                                            <div
-                                                v-for="(person, idx) in slot.waitlist"
-                                                :key="person.email"
-                                                class="flex items-center gap-3 p-2 bg-white/[0.02] rounded-lg"
-                                            >
-                                                <span
-                                                    class="text-xs text-warning font-bold w-6 shrink-0"
-                                                    >#{{ idx + 1 }}</span
-                                                >
-                                                <img
-                                                    :src="
-                                                        person.photoURL ||
-                                                        'https://ui-avatars.com/api/?name=' +
-                                                            person.displayName
-                                                    "
-                                                    class="w-5 h-5 rounded-full shrink-0"
-                                                />
-                                                <span class="text-sm text-muted">{{
-                                                    person.displayName ||
-                                                    person.email.split('@')[0]
-                                                }}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </transition>
+                                    <span v-if="booking === session.id">
+                                        <span class="inline-block w-4 h-4 rounded-full border-2 border-black/20 border-t-black animate-spin align-middle mr-1"></span>
+                                        Booking...
+                                    </span>
+                                    <span v-else>Book</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-
-                <!-- Admin: terminate session -->
-                <div
-                    v-if="isAdmin && allSlotsClosed(course)"
-                    class="mt-4 pt-4 border-t border-dashed border-white/10"
-                >
-                    <button
-                        @click="endSession(course)"
-                        class="w-full py-3 border border-error text-error bg-transparent rounded-xl hover:bg-error/10 transition-colors cursor-pointer font-semibold"
-                    >
-                        <i class="fas fa-power-off mr-2"></i> Terminate Session
-                    </button>
                 </div>
             </div>
         </div>
@@ -380,252 +156,214 @@
 <script>
 import { auth, db } from '../firebase'
 import { onAuthStateChanged } from 'firebase/auth'
+import { collection, query, where, onSnapshot, doc, runTransaction } from 'firebase/firestore'
 import {
-    collection,
-    query,
-    onSnapshot,
-    doc,
-    updateDoc,
-    runTransaction,
-    where,
-} from 'firebase/firestore'
+    getBlockTier,
+    findBestSubBlock,
+    calcBlockPrice,
+    findNextPromotion,
+    getSlotLoad,
+} from '../utils/booking'
 
 export default {
     name: 'HomeView',
     data() {
         return {
             user: null,
-            loading: true,
-            courses: [],
-            expandedSlots: [],
+            authChecked: false,
+            sessionsLoading: true,
+            sessions: [],
+            tileSelections: {},
+            booking: null,
+            cancelling: null,
         }
     },
     computed: {
-        isAdmin() {
-            const adminEmails = ['anawatbooch@gmail.com', 'wow0873233650@gmail.com']
-            return this.user && adminEmails.includes(this.user.email)
-        },
-        sortedCourses() {
-            return [...this.courses]
-                .filter((c) => !c.isTerminated)
-                .sort((a, b) => new Date(a.date) - new Date(b.date))
-        },
-        myBookings() {
-            if (!this.user) return []
-            const bookings = []
-            this.courses.forEach((course) => {
-                if (course.isTerminated) return
-                course.slots.forEach((slot) => {
-                    const inAttendee = slot.attendees.some(
-                        (a) => (a.email || a) === this.user.email,
-                    )
-                    const waitlistIdx = slot.waitlist.findIndex(
-                        (a) => (a.email || a) === this.user.email,
-                    )
-                    if (inAttendee) {
-                        bookings.push({
-                            courseId: course.id,
-                            courseTitle: course.title,
-                            courseDate: course.date,
-                            slot,
-                            type: 'attendee',
-                        })
-                    } else if (waitlistIdx !== -1) {
-                        bookings.push({
-                            courseId: course.id,
-                            courseTitle: course.title,
-                            courseDate: course.date,
-                            slot,
-                            type: 'waitlist',
-                            queuePos: waitlistIdx + 1,
-                        })
-                    }
-                })
-            })
-            return bookings
+        activeSessions() {
+            return this.sessions.filter((s) => !s.isTerminated)
         },
     },
     created() {
         this.unsubscribeAuth = onAuthStateChanged(auth, (user) => {
             this.user = user
+            this.authChecked = true
         })
-        this.unsubscribeSnapshot = onSnapshot(
-            query(collection(db, 'courses'), where('isTerminated', '==', false)),
-            (snapshot) => {
-                this.courses = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
-                this.loading = false
-            },
-        )
+        const q = query(collection(db, 'sessions'), where('isTerminated', '==', false))
+        this.unsubscribeSessions = onSnapshot(q, (snap) => {
+            this.sessions = snap.docs
+                .map((d) => ({ id: d.id, ...d.data() }))
+                .sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime))
+            for (const s of this.sessions) {
+                if (!this.tileSelections[s.id]) {
+                    this.tileSelections[s.id] = Array(s.slots.length).fill('none')
+                }
+            }
+            this.sessionsLoading = false
+        })
     },
     beforeUnmount() {
         this.unsubscribeAuth?.()
-        this.unsubscribeSnapshot?.()
+        this.unsubscribeSessions?.()
     },
     methods: {
-        toggleExpand(slotId) {
-            const index = this.expandedSlots.indexOf(slotId)
-            if (index > -1) this.expandedSlots.splice(index, 1)
-            else this.expandedSlots.push(slotId)
-        },
-        isExpanded(slotId) {
-            return this.expandedSlots.includes(slotId)
-        },
-        editSession(id) {
-            this.$router.push({ name: 'admin', query: { edit: id } })
-        },
         formatDate(dateStr) {
             if (!dateStr) return ''
-            const [year, month, day] = dateStr.split('-')
-            return `${day}/${month}/${year}`
+            const [y, m, d] = dateStr.split('-')
+            return `${d}/${m}/${y}`
         },
-        estimateOpenTime(openAt) {
-            if (!openAt) return ''
-            const date = openAt.toDate()
-            const hour = date.getHours()
-            return `${String(hour).padStart(2, '0')}:00 – ${String(hour + 1).padStart(2, '0')}:00`
+        formatDateTime(ts) {
+            if (!ts) return ''
+            const d = ts.toDate ? ts.toDate() : new Date(ts)
+            const pad = (n) => String(n).padStart(2, '0')
+            return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`
         },
-        getRegistrationStatus(course) {
-            if (this.allSlotsClosed(course)) return { label: 'Closed', class: 'closed' }
-            const now = new Date()
-            const openAt = course.registrationOpenAt.toDate()
-            return now < openAt
-                ? { label: 'Upcoming', class: 'upcoming' }
-                : { label: 'Open', class: 'open' }
+        isRegistrationOpen(session) {
+            if (!session.registrationOpenAt) return false
+            const openAt = session.registrationOpenAt.toDate
+                ? session.registrationOpenAt.toDate()
+                : new Date(session.registrationOpenAt)
+            return new Date() >= openAt
         },
-        allSlotsClosed(course) {
-            return course.slots.every((s) => !s.isActive)
+        userBooking(session) {
+            if (!this.user) return null
+            return (session.bookings || []).find((b) => b.email === this.user.email) ?? null
         },
-        isRegistrationClosed(course) {
-            return new Date() < course.registrationOpenAt.toDate()
+        bookingPrice(session, bk) {
+            if (!bk.confirmedStart) return 0
+            return calcBlockPrice(session.slots, bk.confirmedStart, bk.confirmedEnd)
         },
-        isUserInSlot(slot) {
-            return this.user && slot.attendees.some((a) => (a.email || a) === this.user.email)
+        slotIsFull(session, slotIndex) {
+            const slot = session.slots[slotIndex]
+            return getSlotLoad(session.bookings || [], slot.startTime, slot.endTime) >= slot.capacity
         },
-        isUserInWaitlist(slot) {
-            return this.user && slot.waitlist.some((a) => (a.email || a) === this.user.email)
+        slotRemaining(session, slotIndex) {
+            const slot = session.slots[slotIndex]
+            return Math.max(0, slot.capacity - getSlotLoad(session.bookings || [], slot.startTime, slot.endTime))
         },
-        isConflicting(course, slot) {
-            if (!this.user || !slot.group) return false
-            return course.slots.some(
-                (s) => s.group === slot.group && s.id !== slot.id && this.isUserInSlot(s),
-            )
-        },
-        isButtonDisabled(course, slot) {
-            return (
-                !slot.isActive || this.isRegistrationClosed(course) || this.isConflicting(course, slot)
-            )
-        },
-        async toggleSlotStatus(course, slot) {
-            try {
-                const updatedSlots = course.slots.map((s) =>
-                    s.id === slot.id ? { ...s, isActive: !s.isActive } : s,
-                )
-                await updateDoc(doc(db, 'courses', course.id), { slots: updatedSlots })
-            } catch (error) {
-                alert(error)
+
+        handleTileClick(sessionId, slotIndex, session) {
+            const sel = [...(this.tileSelections[sessionId] || Array(session.slots.length).fill('none'))]
+            const cur = sel[slotIndex]
+            const next = cur === 'none' ? 'blue' : cur === 'blue' ? 'yellow' : 'none'
+            const proposed = [...sel]
+            proposed[slotIndex] = next
+            if (this.isValidSelection(proposed)) {
+                this.tileSelections[sessionId] = proposed
             }
         },
-        async togglePaymentStatus(course, slot, person) {
+        isValidSelection(sel) {
+            const blues = sel.map((s, i) => (s === 'blue' ? i : -1)).filter((i) => i >= 0)
+            const yellows = sel.map((s, i) => (s === 'yellow' ? i : -1)).filter((i) => i >= 0)
+            if (blues.length === 0) return yellows.length === 0
+            const blueMin = Math.min(...blues)
+            const blueMax = Math.max(...blues)
+            if (blueMax - blueMin + 1 !== blues.length) return false
+            if (yellows.some((y) => y >= blueMin && y <= blueMax)) return false
+            const all = sel.map((s, i) => (s !== 'none' ? i : -1)).filter((i) => i >= 0)
+            const allMin = Math.min(...all)
+            const allMax = Math.max(...all)
+            return allMax - allMin + 1 === all.length
+        },
+        selectionInfo(session) {
+            const sel = this.tileSelections[session.id]
+            if (!sel) return null
+            const blues = sel.map((s, i) => (s === 'blue' ? i : -1)).filter((i) => i >= 0)
+            if (blues.length === 0) return null
+            const all = sel.map((s, i) => (s !== 'none' ? i : -1)).filter((i) => i >= 0)
+            const blueStart = session.slots[Math.min(...blues)].startTime
+            const blueEnd = session.slots[Math.max(...blues)].endTime
+            const yellowStart = session.slots[Math.min(...all)].startTime
+            const yellowEnd = session.slots[Math.max(...all)].endTime
+            const tier = getBlockTier(session.tiers || [], yellowStart, yellowEnd)
+            const maxPrice = calcBlockPrice(session.slots, yellowStart, yellowEnd)
+            return { blueStart, blueEnd, yellowStart, yellowEnd, tier, maxPrice }
+        },
+        tileClass(sessionId, slotIndex, session) {
+            const sel = this.tileSelections[sessionId] || []
+            const state = sel[slotIndex] || 'none'
+            const base = 'flex flex-col items-center justify-center w-20 h-20 rounded-xl border transition-all'
+            if (state === 'blue') return `${base} bg-blue-500 border-blue-400 text-white cursor-pointer`
+            if (state === 'yellow') return `${base} bg-amber-400 border-amber-300 text-black cursor-pointer`
+            if (!this.user) return `${base} bg-white/5 border-white/10 text-muted opacity-60 cursor-default`
+            return `${base} bg-white/5 border-white/10 text-white hover:bg-white/10 hover:border-white/20 cursor-pointer`
+        },
+
+        async book(session) {
+            const info = this.selectionInfo(session)
+            if (!info) return
+            this.booking = session.id
             try {
-                const updatedSlots = course.slots.map((s) => {
-                    if (s.id === slot.id) {
-                        const updatedAttendees = s.attendees.map((a) =>
-                            (a.email || a) === person.email ? { ...a, isPaid: !a.isPaid } : a,
-                        )
-                        return { ...s, attendees: updatedAttendees }
+                const sessionRef = doc(db, 'sessions', session.id)
+                const result = await runTransaction(db, async (tx) => {
+                    const snap = await tx.get(sessionRef)
+                    const s = { id: snap.id, ...snap.data() }
+                    if (!this.isRegistrationOpen(s)) throw new Error('Registration is not open yet.')
+                    if ((s.bookings || []).find((b) => b.email === this.user.email)) {
+                        throw new Error('You already have a booking for this session.')
                     }
-                    return s
-                })
-                await updateDoc(doc(db, 'courses', course.id), { slots: updatedSlots })
-            } catch (error) {
-                alert(error)
-            }
-        },
-        async endSession(course) {
-            const input = prompt('Type "terminate":')
-            if (input === 'terminate')
-                await updateDoc(doc(db, 'courses', course.id), { isTerminated: true })
-        },
-        async handleBooking(course, slot) {
-            if (!this.user) {
-                alert('Please login first')
-                return
-            }
-            if (!confirm('Join this class?')) return
-            try {
-                const courseRef = doc(db, 'courses', course.id)
-                await runTransaction(db, async (transaction) => {
-                    const sfDoc = await transaction.get(courseRef)
-                    const currentData = sfDoc.data()
-                    const slotIdx = currentData.slots.findIndex((s) => s.id === slot.id)
-                    const targetSlot = currentData.slots[slotIdx]
-                    const userProfile = {
+                    const bestSub = findBestSubBlock(
+                        s.slots, s.bookings || [],
+                        info.blueStart, info.blueEnd, info.yellowStart, info.yellowEnd,
+                    )
+                    const preferredTier = getBlockTier(s.tiers || [], info.yellowStart, info.yellowEnd)
+                    const newBooking = {
+                        id: `bk_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
                         email: this.user.email,
                         displayName: this.user.displayName,
                         photoURL: this.user.photoURL,
+                        blueStart: info.blueStart,
+                        blueEnd: info.blueEnd,
+                        yellowStart: info.yellowStart,
+                        yellowEnd: info.yellowEnd,
+                        preferredTier,
+                        confirmedStart: bestSub?.start ?? null,
+                        confirmedEnd: bestSub?.end ?? null,
+                        status: bestSub ? 'confirmed' : 'waitlisted',
                         isPaid: false,
+                        joinedAt: new Date(),
                     }
-                    if (targetSlot.attendees.some((a) => (a.email || a) === userProfile.email))
-                        throw 'Already registered.'
-                    const updatedSlots = [...currentData.slots]
-                    if (targetSlot.attendees.length < targetSlot.capacity)
-                        updatedSlots[slotIdx].attendees.push(userProfile)
-                    else updatedSlots[slotIdx].waitlist.push(userProfile)
-                    transaction.update(courseRef, { slots: updatedSlots })
+                    tx.update(sessionRef, { bookings: [...(s.bookings || []), newBooking] })
+                    return newBooking.status
                 })
-                alert('Success!')
-            } catch (error) {
-                alert(error.code === 'permission-denied' ? 'Not open yet' : error)
+                this.tileSelections[session.id] = Array(session.slots.length).fill('none')
+                alert(result === 'confirmed' ? 'Booking confirmed!' : 'Added to waitlist.')
+            } catch (err) {
+                alert(err.message)
+            } finally {
+                this.booking = null
             }
         },
-        async handleCancel(courseId, slot) {
-            if (!confirm('Cancel booking?')) return
+
+        async cancelBooking(session) {
+            if (!confirm('Cancel your booking?')) return
+            this.cancelling = session.id
             try {
-                await runTransaction(db, async (transaction) => {
-                    const sfDoc = await transaction.get(doc(db, 'courses', courseId))
-                    const currentData = sfDoc.data()
-                    const slotIdx = currentData.slots.findIndex((s) => s.id === slot.id)
-                    const targetSlot = currentData.slots[slotIdx]
-                    const updatedSlots = [...currentData.slots]
-                    const isAttendee = targetSlot.attendees.some(
-                        (a) => (a.email || a) === this.user.email,
-                    )
-                    if (isAttendee) {
-                        updatedSlots[slotIdx].attendees = targetSlot.attendees.filter(
-                            (a) => (a.email || a) !== this.user.email,
-                        )
-                        if (targetSlot.waitlist.length > 0)
-                            updatedSlots[slotIdx].attendees.push(
-                                updatedSlots[slotIdx].waitlist.shift(),
+                const sessionRef = doc(db, 'sessions', session.id)
+                await runTransaction(db, async (tx) => {
+                    const snap = await tx.get(sessionRef)
+                    const s = { id: snap.id, ...snap.data() }
+                    const toCancel = (s.bookings || []).find((b) => b.email === this.user.email)
+                    if (!toCancel) throw new Error('Booking not found.')
+                    const remaining = (s.bookings || []).filter((b) => b.email !== this.user.email)
+                    let finalBookings = remaining
+                    if (toCancel.status === 'confirmed') {
+                        const promo = findNextPromotion({ ...s, bookings: remaining })
+                        if (promo) {
+                            finalBookings = finalBookings.map((b) =>
+                                b.id === promo.bookingId
+                                    ? { ...b, status: 'confirmed', confirmedStart: promo.confirmedStart, confirmedEnd: promo.confirmedEnd }
+                                    : b,
                             )
-                    } else {
-                        updatedSlots[slotIdx].waitlist = targetSlot.waitlist.filter(
-                            (a) => (a.email || a) !== this.user.email,
-                        )
+                        }
                     }
-                    transaction.update(doc(db, 'courses', courseId), { slots: updatedSlots })
+                    tx.update(sessionRef, { bookings: finalBookings })
                 })
-                alert('Cancelled')
-            } catch (error) {
-                alert(error)
+            } catch (err) {
+                alert(err.message)
+            } finally {
+                this.cancelling = null
             }
         },
     },
 }
 </script>
-
-<style scoped>
-/* Vue transition for expand/collapse attendee list */
-.slide-enter-active,
-.slide-leave-active {
-    transition: all 0.3s ease;
-    max-height: 600px;
-    overflow: hidden;
-}
-.slide-enter-from,
-.slide-leave-to {
-    max-height: 0;
-    opacity: 0;
-    overflow: hidden;
-}
-</style>
