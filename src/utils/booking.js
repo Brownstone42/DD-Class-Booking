@@ -64,10 +64,13 @@ export function canConfirmBlock(slots, bookings, blockStart, blockEnd) {
     )
 }
 
-// Best (longest) confirmable sub-block for a user's blue/yellow selection, or null
-export function findBestSubBlock(slots, bookings, blueStart, blueEnd, yellowStart, yellowEnd) {
+// Best (longest) confirmable sub-block for a user's blue/yellow selection, or null.
+// Only tries sub-blocks that map to the same tier as the full yellow range.
+export function findBestSubBlock(slots, bookings, blueStart, blueEnd, yellowStart, yellowEnd, tiers = []) {
+    const preferredTier = getBlockTier(tiers, yellowStart, yellowEnd)
     return (
         generateSubBlocks(blueStart, blueEnd, yellowStart, yellowEnd).find((sub) =>
+            getBlockTier(tiers, sub.start, sub.end) === preferredTier &&
             canConfirmBlock(slots, bookings, sub.start, sub.end),
         ) ?? null
     )
@@ -92,7 +95,8 @@ function getActiveTierNumbers(tiers, activeTier) {
 const tsMs = (ts) =>
     ts?.toMillis?.() ?? (ts instanceof Date ? ts.getTime() : Number(ts) ?? 0)
 
-// Find the single next waitlisted booking to promote, checking tiers 1→N FCFS
+// Find the single next waitlisted booking to promote, checking tiers 1→N FCFS.
+// Sub-blocks are only tried if they map to the same tier as the booking's preferredTier.
 export function findNextPromotion(session) {
     const { slots, tiers, activeTier, bookings } = session
 
@@ -104,12 +108,13 @@ export function findNextPromotion(session) {
 
     for (const tier of getActiveTierNumbers(tiers, activeTier)) {
         for (const bk of waitlisted) {
+            if (bk.preferredTier !== tier) continue
             for (const sub of generateSubBlocks(
                 bk.blueStart, bk.blueEnd,
                 bk.yellowStart, bk.yellowEnd,
             )) {
                 if (
-                    getBlockTier(tiers, sub.start, sub.end) === tier &&
+                    getBlockTier(tiers, sub.start, sub.end) === bk.preferredTier &&
                     canConfirmBlock(slots, bookings, sub.start, sub.end)
                 ) {
                     return { bookingId: bk.id, confirmedStart: sub.start, confirmedEnd: sub.end }

@@ -60,9 +60,15 @@
             </div>
 
             <!-- Edit form -->
-            <div class="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6 md:p-8 mb-6">
-                <h2 class="text-lg font-bold mb-6"><i class="fas fa-edit text-primary mr-2"></i>Edit Session</h2>
-                <div class="grid gap-6">
+            <div class="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl mb-6 overflow-hidden">
+                <button
+                    @click="editExpanded = !editExpanded"
+                    class="w-full flex items-center justify-between p-6 md:px-8 md:py-6 cursor-pointer bg-transparent border-none text-left"
+                >
+                    <h2 class="text-lg font-bold"><i class="fas fa-edit text-primary mr-2"></i>Edit Session</h2>
+                    <i :class="editExpanded ? 'fa-chevron-up' : 'fa-chevron-down'" class="fas text-muted text-sm transition-transform"></i>
+                </button>
+                <div v-show="editExpanded" class="grid gap-6 px-6 md:px-8 pb-6 md:pb-8">
                     <div>
                         <label class="block mb-2 font-semibold text-sm">Session Title</label>
                         <input type="text" v-model="form.title" class="field" />
@@ -176,6 +182,12 @@
                         <div class="flex-1 min-w-0">
                             <p class="text-sm font-semibold truncate">{{ bk.displayName }}</p>
                             <p class="text-xs text-muted">{{ bk.confirmedStart }}–{{ bk.confirmedEnd }} &middot; ฿{{ blockPrice(bk) }}</p>
+                            <p class="text-xs text-muted mt-0.5">
+                                <span class="text-blue-400">Must</span> {{ bk.blueStart }}–{{ bk.blueEnd }}
+                                <template v-if="bk.blueStart !== bk.yellowStart || bk.blueEnd !== bk.yellowEnd">
+                                    &middot; <span class="text-amber-400">Preferred</span> {{ bk.yellowStart }}–{{ bk.yellowEnd }}
+                                </template>
+                            </p>
                         </div>
                         <button
                             @click="togglePayment(bk)"
@@ -203,8 +215,10 @@
                         <div class="flex-1 min-w-0">
                             <p class="text-sm font-semibold truncate">{{ bk.displayName }}</p>
                             <p class="text-xs text-muted">
-                                Wants {{ bk.yellowStart }}–{{ bk.yellowEnd }}
-                                <span v-if="bk.blueStart !== bk.yellowStart || bk.blueEnd !== bk.yellowEnd" class="text-primary">(must: {{ bk.blueStart }}–{{ bk.blueEnd }})</span>
+                                <span class="text-blue-400">Must</span> {{ bk.blueStart }}–{{ bk.blueEnd }}
+                                <template v-if="bk.blueStart !== bk.yellowStart || bk.blueEnd !== bk.yellowEnd">
+                                    &middot; <span class="text-amber-400">Preferred</span> {{ bk.yellowStart }}–{{ bk.yellowEnd }}
+                                </template>
                             </p>
                         </div>
                         <span class="text-xs px-2.5 py-1 rounded-full border border-warning/30 text-warning bg-warning/5 flex-shrink-0">
@@ -232,6 +246,7 @@ export default {
             user: null,
             authChecked: false,
             sessionLoading: true,
+            editExpanded: false,
             adminEmails: ['anawatbooch@gmail.com', 'wow0873233650@gmail.com'],
             session: null,
             saving: false,
@@ -299,9 +314,6 @@ export default {
         this._fpDT?.destroy()
     },
     watch: {
-        authChecked(val) {
-            if (val && this.isAdmin) this.$nextTick(() => this.initFlatpickr())
-        },
         'form.date'(val) {
             if (this._fpDate) val ? this._fpDate.setDate(new Date(val + 'T00:00:00'), false) : this._fpDate.clear()
         },
@@ -323,6 +335,7 @@ export default {
                 this.session = { id: snap.id, ...snap.data() }
                 this.populateForm(this.session)
                 this.sessionLoading = false
+                if (!this._fpDate) this.$nextTick(() => this.initFlatpickr())
             })
         },
 
@@ -470,11 +483,17 @@ export default {
                     promotedCount = promotions.length
                     let bookings = [...s.bookings]
                     for (const promo of promotions) {
+                        const promotedEmail = bookings.find((b) => b.id === promo.bookingId)?.email
                         bookings = bookings.map((b) =>
                             b.id === promo.bookingId
                                 ? { ...b, status: 'confirmed', confirmedStart: promo.confirmedStart, confirmedEnd: promo.confirmedEnd }
                                 : b,
                         )
+                        if (promotedEmail) {
+                            bookings = bookings.filter(
+                                (b) => !(b.email === promotedEmail && b.status === 'waitlisted'),
+                            )
+                        }
                     }
                     tx.update(sessionRef, { activeTier: newTier, bookings })
                 })

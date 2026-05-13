@@ -44,106 +44,116 @@
                         Registration opens {{ formatDateTime(session.registrationOpenAt) }}
                     </div>
 
-                    <!-- User's existing booking -->
-                    <div v-else-if="userBooking(session)">
-                        <div
-                            :class="[
-                                'rounded-xl p-5 border',
-                                userBooking(session).status === 'confirmed'
-                                    ? 'bg-success/5 border-success/30'
-                                    : 'bg-warning/5 border-warning/30'
-                            ]"
-                        >
-                            <div class="flex items-start justify-between gap-4 flex-wrap">
-                                <div>
-                                    <p :class="['font-bold', userBooking(session).status === 'confirmed' ? 'text-success' : 'text-warning']">
-                                        {{ userBooking(session).status === 'confirmed' ? 'Booking Confirmed' : 'On Waitlist' }}
-                                    </p>
-                                    <p class="text-sm text-muted mt-1" v-if="userBooking(session).status === 'confirmed'">
-                                        {{ userBooking(session).confirmedStart }}–{{ userBooking(session).confirmedEnd }}
-                                        &middot; ฿{{ bookingPrice(session, userBooking(session)) }}
-                                        <span :class="['ml-2 text-xs px-2 py-0.5 rounded-full', userBooking(session).isPaid ? 'text-success bg-success/10' : 'text-warning bg-warning/10']">
-                                            {{ userBooking(session).isPaid ? 'Paid' : 'Unpaid' }}
-                                        </span>
-                                    </p>
-                                    <p class="text-sm text-muted mt-1" v-else>
-                                        Preferred: {{ userBooking(session).yellowStart }}–{{ userBooking(session).yellowEnd }}
-                                        <span v-if="userBooking(session).blueStart !== userBooking(session).yellowStart || userBooking(session).blueEnd !== userBooking(session).yellowEnd">
-                                            &middot; must: {{ userBooking(session).blueStart }}–{{ userBooking(session).blueEnd }}
-                                        </span>
-                                        &middot; Tier {{ userBooking(session).preferredTier }}
-                                    </p>
+                    <!-- User's existing bookings -->
+                    <div v-else>
+                        <div v-if="userBookings(session).length > 0" class="grid gap-2 mb-4">
+                            <div
+                                v-for="bk in userBookings(session)"
+                                :key="bk.id"
+                                :class="[
+                                    'rounded-xl p-5 border',
+                                    bk.status === 'confirmed'
+                                        ? 'bg-success/5 border-success/30'
+                                        : 'bg-warning/5 border-warning/30'
+                                ]"
+                            >
+                                <div class="flex items-start justify-between gap-4 flex-wrap">
+                                    <div>
+                                        <p :class="['font-bold', bk.status === 'confirmed' ? 'text-success' : 'text-warning']">
+                                            {{ bk.status === 'confirmed' ? 'Booking Confirmed' : 'On Waitlist' }}
+                                        </p>
+                                        <p class="text-sm text-muted mt-1" v-if="bk.status === 'confirmed'">
+                                            {{ bk.confirmedStart }}–{{ bk.confirmedEnd }}
+                                            &middot; ฿{{ bookingPrice(session, bk) }}
+                                            <span :class="['ml-2 text-xs px-2 py-0.5 rounded-full', bk.isPaid ? 'text-success bg-success/10' : 'text-warning bg-warning/10']">
+                                                {{ bk.isPaid ? 'Paid' : 'Unpaid' }}
+                                            </span>
+                                        </p>
+                                        <p class="text-xs text-muted mt-1.5">
+                                            <span class="text-blue-400">Must</span> {{ bk.blueStart }}–{{ bk.blueEnd }}
+                                            <template v-if="bk.blueStart !== bk.yellowStart || bk.blueEnd !== bk.yellowEnd">
+                                                &middot; <span class="text-amber-400">Preferred</span> {{ bk.yellowStart }}–{{ bk.yellowEnd }}
+                                            </template>
+                                            <template v-if="bk.status === 'waitlisted'">
+                                                &middot; Tier {{ bk.preferredTier }}
+                                            </template>
+                                        </p>
+                                    </div>
+                                    <button
+                                        @click="cancelBooking(session, bk)"
+                                        :disabled="cancelling === bk.id"
+                                        class="text-sm px-4 py-2 rounded-xl border border-error/30 text-error hover:bg-error/10 transition-colors cursor-pointer bg-transparent disabled:opacity-50"
+                                    >Cancel</button>
                                 </div>
-                                <button
-                                    @click="cancelBooking(session)"
-                                    :disabled="cancelling === session.id"
-                                    class="text-sm px-4 py-2 rounded-xl border border-error/30 text-error hover:bg-error/10 transition-colors cursor-pointer bg-transparent disabled:opacity-50"
-                                >Cancel</button>
                             </div>
                         </div>
-                    </div>
 
-                    <!-- Tile selection -->
-                    <div v-else>
-                        <!-- Login prompt -->
-                        <div v-if="!user" class="text-center py-6 text-muted text-sm bg-white/[0.03] rounded-xl border border-white/10 mb-4">
-                            <i class="fas fa-lock text-xl mb-2 block"></i>
-                            Log in to book a slot.
-                        </div>
+                        <!-- Tile selector: visible when no confirmed booking yet -->
+                        <div v-if="!userHasConfirmed(session)">
+                            <!-- Login prompt -->
+                            <div v-if="!user" class="text-center py-6 text-muted text-sm bg-white/[0.03] rounded-xl border border-white/10 mb-4">
+                                <i class="fas fa-lock text-xl mb-2 block"></i>
+                                Log in to book a slot.
+                            </div>
 
-                        <!-- Tiles -->
-                        <div class="flex flex-wrap gap-2 mb-4">
-                            <button
-                                v-for="(slot, si) in session.slots"
-                                :key="si"
-                                @click="user && handleTileClick(session.id, si, session)"
-                                :class="tileClass(session.id, si, session)"
-                                :disabled="!user"
-                            >
-                                <span class="font-mono font-semibold text-sm">{{ slot.startTime }}</span>
-                                <span class="text-xs mt-0.5 opacity-80">฿{{ slot.price }}</span>
-                                <span v-if="slotIsFull(session, si)" class="text-[0.6rem] mt-0.5 opacity-60">FULL</span>
-                                <span v-else class="text-[0.6rem] mt-0.5 opacity-60">{{ slotRemaining(session, si) }} left</span>
-                            </button>
-                        </div>
-
-                        <!-- Legend -->
-                        <div class="flex gap-4 flex-wrap text-xs text-muted mb-5">
-                            <span class="flex items-center gap-1.5">
-                                <span class="w-3 h-3 rounded bg-blue-500 inline-block"></span> Must have
-                            </span>
-                            <span class="flex items-center gap-1.5">
-                                <span class="w-3 h-3 rounded bg-amber-400 inline-block"></span> Prefer but optional
-                            </span>
-                        </div>
-
-                        <!-- Selection summary + book button -->
-                        <div v-if="user && selectionInfo(session)" class="bg-white/[0.05] border border-white/10 rounded-xl p-4">
-                            <div class="flex items-start justify-between gap-4 flex-wrap">
-                                <div>
-                                    <p class="font-semibold">
-                                        {{ selectionInfo(session).yellowStart }}–{{ selectionInfo(session).yellowEnd }}
-                                        <span
-                                            v-if="selectionInfo(session).blueStart !== selectionInfo(session).yellowStart || selectionInfo(session).blueEnd !== selectionInfo(session).yellowEnd"
-                                            class="text-muted text-sm font-normal ml-1"
-                                        >(must: {{ selectionInfo(session).blueStart }}–{{ selectionInfo(session).blueEnd }})</span>
-                                    </p>
-                                    <p class="text-sm text-muted mt-0.5">
-                                        Tier {{ selectionInfo(session).tier }}
-                                        &middot; up to ฿{{ selectionInfo(session).maxPrice }}
-                                    </p>
-                                </div>
+                            <!-- Tiles -->
+                            <div class="flex flex-wrap gap-2 mb-4">
                                 <button
-                                    @click="book(session)"
-                                    :disabled="booking === session.id"
-                                    class="bg-primary text-black font-bold px-6 py-2.5 rounded-xl hover:-translate-y-0.5 hover:shadow-[0_8px_20px_rgba(192,255,0,0.3)] transition-all cursor-pointer border-none disabled:opacity-60 disabled:cursor-not-allowed flex-shrink-0"
+                                    v-for="(slot, si) in session.slots"
+                                    :key="si"
+                                    @click="user && handleTileClick(session.id, si, session)"
+                                    :class="tileClass(session.id, si, session)"
+                                    :disabled="!user"
                                 >
-                                    <span v-if="booking === session.id">
-                                        <span class="inline-block w-4 h-4 rounded-full border-2 border-black/20 border-t-black animate-spin align-middle mr-1"></span>
-                                        Booking...
-                                    </span>
-                                    <span v-else>Book</span>
+                                    <span class="font-mono font-semibold text-sm">{{ slot.startTime }}</span>
+                                    <span class="text-xs mt-0.5 opacity-80">฿{{ slot.price }}</span>
+                                    <span v-if="slotIsFull(session, si)" class="text-[0.6rem] mt-0.5 opacity-60">FULL</span>
+                                    <span v-else class="text-[0.6rem] mt-0.5 opacity-60">{{ slotRemaining(session, si) }} left</span>
                                 </button>
+                            </div>
+
+                            <!-- Legend + hint -->
+                            <p class="text-xs text-muted mb-3">Tap once to mark a slot as <span class="text-blue-400">must-have</span>, tap again to extend as <span class="text-amber-400">preferred</span>. Must-have slots must be contiguous.</p>
+                            <div class="flex gap-4 flex-wrap text-xs text-muted mb-5">
+                                <span class="flex items-center gap-1.5">
+                                    <span class="w-3 h-3 rounded bg-blue-500 inline-block"></span> Must have
+                                </span>
+                                <span class="flex items-center gap-1.5">
+                                    <span class="w-3 h-3 rounded bg-amber-400 inline-block"></span> Prefer but optional
+                                </span>
+                            </div>
+
+                            <!-- Selection summary + book button -->
+                            <div v-if="user && selectionInfo(session)" class="bg-white/[0.05] border border-white/10 rounded-xl p-4">
+                                <div class="flex items-start justify-between gap-4 flex-wrap">
+                                    <div>
+                                        <p class="font-semibold">
+                                            {{ selectionInfo(session).yellowStart }}–{{ selectionInfo(session).yellowEnd }}
+                                            <span
+                                                v-if="selectionInfo(session).blueStart !== selectionInfo(session).yellowStart || selectionInfo(session).blueEnd !== selectionInfo(session).yellowEnd"
+                                                class="text-muted text-sm font-normal ml-1"
+                                            >(must: {{ selectionInfo(session).blueStart }}–{{ selectionInfo(session).blueEnd }})</span>
+                                        </p>
+                                        <p class="text-sm text-muted mt-0.5">
+                                            Tier {{ selectionInfo(session).tier }}
+                                            &middot; up to ฿{{ selectionInfo(session).maxPrice }}
+                                        </p>
+                                        <p v-if="selectionInfo(session).tier > session.activeTier" class="text-xs text-error mt-1">
+                                            This slot is Tier {{ selectionInfo(session).tier }} — not open yet.
+                                        </p>
+                                    </div>
+                                    <button
+                                        @click="book(session)"
+                                        :disabled="booking === session.id || selectionInfo(session).tier > session.activeTier"
+                                        class="bg-primary text-black font-bold px-6 py-2.5 rounded-xl hover:-translate-y-0.5 hover:shadow-[0_8px_20px_rgba(192,255,0,0.3)] transition-all cursor-pointer border-none disabled:opacity-60 disabled:cursor-not-allowed flex-shrink-0"
+                                    >
+                                        <span v-if="booking === session.id">
+                                            <span class="inline-block w-4 h-4 rounded-full border-2 border-black/20 border-t-black animate-spin align-middle mr-1"></span>
+                                            Booking...
+                                        </span>
+                                        <span v-else>Book</span>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -224,9 +234,12 @@ export default {
                 : new Date(session.registrationOpenAt)
             return new Date() >= openAt
         },
-        userBooking(session) {
-            if (!this.user) return null
-            return (session.bookings || []).find((b) => b.email === this.user.email) ?? null
+        userBookings(session) {
+            if (!this.user) return []
+            return (session.bookings || []).filter((b) => b.email === this.user.email)
+        },
+        userHasConfirmed(session) {
+            return this.userBookings(session).some((b) => b.status === 'confirmed')
         },
         bookingPrice(session, bk) {
             if (!bk.confirmedStart) return 0
@@ -298,14 +311,15 @@ export default {
                     const snap = await tx.get(sessionRef)
                     const s = { id: snap.id, ...snap.data() }
                     if (!this.isRegistrationOpen(s)) throw new Error('Registration is not open yet.')
-                    if ((s.bookings || []).find((b) => b.email === this.user.email)) {
-                        throw new Error('You already have a booking for this session.')
+                    if ((s.bookings || []).find((b) => b.email === this.user.email && b.status === 'confirmed')) {
+                        throw new Error('You already have a confirmed booking for this session.')
                     }
                     const bestSub = findBestSubBlock(
                         s.slots, s.bookings || [],
-                        info.blueStart, info.blueEnd, info.yellowStart, info.yellowEnd,
+                        info.blueStart, info.blueEnd, info.yellowStart, info.yellowEnd, s.tiers || [],
                     )
                     const preferredTier = getBlockTier(s.tiers || [], info.yellowStart, info.yellowEnd)
+                    if (preferredTier > s.activeTier) throw new Error(`This slot is Tier ${preferredTier} and is not open yet.`)
                     const newBooking = {
                         id: `bk_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
                         email: this.user.email,
@@ -322,7 +336,14 @@ export default {
                         isPaid: false,
                         joinedAt: new Date(),
                     }
-                    tx.update(sessionRef, { bookings: [...(s.bookings || []), newBooking] })
+                    let updatedBookings = [...(s.bookings || []), newBooking]
+                    if (newBooking.status === 'confirmed') {
+                        // auto-drop any waitlisted entries by this user (they got confirmed)
+                        updatedBookings = updatedBookings.filter(
+                            (b) => !(b.email === this.user.email && b.status === 'waitlisted'),
+                        )
+                    }
+                    tx.update(sessionRef, { bookings: updatedBookings })
                     return newBooking.status
                 })
                 this.tileSelections[session.id] = Array(session.slots.length).fill('none')
@@ -334,26 +355,32 @@ export default {
             }
         },
 
-        async cancelBooking(session) {
-            if (!confirm('Cancel your booking?')) return
-            this.cancelling = session.id
+        async cancelBooking(session, bk) {
+            if (!confirm('Cancel this booking?')) return
+            this.cancelling = bk.id
             try {
                 const sessionRef = doc(db, 'sessions', session.id)
                 await runTransaction(db, async (tx) => {
                     const snap = await tx.get(sessionRef)
                     const s = { id: snap.id, ...snap.data() }
-                    const toCancel = (s.bookings || []).find((b) => b.email === this.user.email)
+                    const toCancel = (s.bookings || []).find((b) => b.id === bk.id)
                     if (!toCancel) throw new Error('Booking not found.')
-                    const remaining = (s.bookings || []).filter((b) => b.email !== this.user.email)
-                    let finalBookings = remaining
+                    let finalBookings = (s.bookings || []).filter((b) => b.id !== bk.id)
                     if (toCancel.status === 'confirmed') {
-                        const promo = findNextPromotion({ ...s, bookings: remaining })
+                        const promo = findNextPromotion({ ...s, bookings: finalBookings })
                         if (promo) {
+                            const promotedEmail = finalBookings.find((b) => b.id === promo.bookingId)?.email
                             finalBookings = finalBookings.map((b) =>
                                 b.id === promo.bookingId
                                     ? { ...b, status: 'confirmed', confirmedStart: promo.confirmedStart, confirmedEnd: promo.confirmedEnd }
                                     : b,
                             )
+                            // remove the promoted user's other waitlisted entries
+                            if (promotedEmail) {
+                                finalBookings = finalBookings.filter(
+                                    (b) => !(b.email === promotedEmail && b.status === 'waitlisted'),
+                                )
+                            }
                         }
                     }
                     tx.update(sessionRef, { bookings: finalBookings })
