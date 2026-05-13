@@ -13,7 +13,8 @@
       "Bash(where pip *)",
       "Bash(where pip3 *)",
       "Bash(npm run *)",
-      "Bash(npm uninstall *)"
+      "Bash(npm uninstall *)",
+      "WebSearch"
     ]
   },
   "enabledPlugins": {

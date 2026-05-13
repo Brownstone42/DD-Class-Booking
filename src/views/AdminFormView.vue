@@ -80,75 +80,65 @@
 
                     <!-- Tier configuration -->
                     <div class="border border-white/10 rounded-xl p-5">
-                        <div class="flex justify-between items-center mb-4">
-                            <div>
-                                <h3 class="text-base font-semibold">Priority Tiers</h3>
-                                <p class="text-xs text-muted mt-0.5">Tier 1 books immediately. Higher tiers wait for your trigger.</p>
-                            </div>
-                            <button
-                                @click="addTier"
-                                class="inline-flex items-center gap-1.5 border border-white/10 text-white text-sm px-3 py-1.5 rounded-lg hover:bg-white/5 transition-colors cursor-pointer bg-transparent"
-                            >
-                                <i class="fas fa-plus"></i> Tier
-                            </button>
+                        <div class="mb-4">
+                            <h3 class="text-base font-semibold">Priority Tiers</h3>
+                            <p class="text-xs text-muted mt-0.5">Tier 1 books immediately. Tier 2 &amp; 3 are auto-generated when you open them.</p>
                         </div>
 
-                        <div v-if="form.tiers.length === 0" class="text-muted text-sm text-center py-4">
-                            No tiers configured — all bookings treated equally (Tier 1).
-                        </div>
-
-                        <div
-                            v-for="(tierDef, ti) in form.tiers"
-                            :key="ti"
-                            class="mb-4 bg-white/[0.03] p-4 rounded-xl border border-white/10"
-                        >
-                            <div class="flex items-center justify-between mb-3">
-                                <span class="font-bold text-sm text-primary">Tier {{ tierDef.tier }}</span>
-                                <button @click="removeTier(ti)" class="text-xs text-error hover:text-red-400 transition-colors cursor-pointer bg-transparent border-none">
-                                    Remove Tier
-                                </button>
-                            </div>
-
-                            <div v-if="boundaryTimes.length < 2" class="text-xs text-muted mb-2">
-                                Set session start &amp; end time first.
-                            </div>
-
-                            <div v-else class="grid gap-2 mb-3">
-                                <div
-                                    v-for="(block, bi) in tierDef.blocks"
-                                    :key="bi"
-                                    class="flex items-center gap-2"
-                                >
-                                    <select v-model="block.start" class="field text-sm py-2 flex-1">
-                                        <option value="" disabled>Start</option>
+                        <!-- Tier 1 -->
+                        <div class="mb-3 bg-white/[0.03] p-4 rounded-xl border border-white/10">
+                            <span class="font-bold text-sm text-primary block mb-3">Tier 1</span>
+                            <div v-if="boundaryTimes.length < 2" class="text-xs text-muted">Set session time first.</div>
+                            <div v-else>
+                                <label class="block text-xs text-muted mb-1.5">Fixed period (always blue — users cannot change)</label>
+                                <div class="flex items-center gap-2 mb-4">
+                                    <select v-model="form.tier1.fixedStart" class="field text-sm py-2 flex-1">
+                                        <option value="" disabled>Fixed Start</option>
                                         <option v-for="t in boundaryTimes.slice(0, -1)" :key="t" :value="t">{{ t }}</option>
                                     </select>
-                                    <span class="text-muted text-sm">→</span>
-                                    <select v-model="block.end" class="field text-sm py-2 flex-1">
-                                        <option value="" disabled>End</option>
-                                        <option
-                                            v-for="t in boundaryTimes.slice(1)"
-                                            :key="t"
-                                            :value="t"
-                                            :disabled="t <= block.start"
-                                        >{{ t }}</option>
+                                    <span class="text-muted text-sm flex-shrink-0">→</span>
+                                    <select v-model="form.tier1.fixedEnd" class="field text-sm py-2 flex-1">
+                                        <option value="" disabled>Fixed End</option>
+                                        <option v-for="t in boundaryTimes.slice(1)" :key="t" :value="t" :disabled="t <= form.tier1.fixedStart">{{ t }}</option>
                                     </select>
-                                    <button
-                                        @click="removeBlock(ti, bi)"
-                                        class="w-6 h-6 flex items-center justify-center text-error hover:text-red-400 transition-colors cursor-pointer bg-transparent border-none flex-shrink-0"
-                                    >
-                                        <i class="fas fa-times text-xs"></i>
-                                    </button>
                                 </div>
+                                <label class="block text-xs text-muted mb-1.5">Allowed booking ranges (users can extend yellow up to these)</label>
+                                <div class="grid gap-2 mb-3">
+                                    <div v-for="(block, bi) in form.tier1.blocks" :key="bi" class="flex items-center gap-2">
+                                        <select v-model="block.start" class="field text-sm py-2 flex-1">
+                                            <option value="" disabled>Start</option>
+                                            <option v-for="t in boundaryTimes.slice(0, -1)" :key="t" :value="t">{{ t }}</option>
+                                        </select>
+                                        <span class="text-muted text-sm flex-shrink-0">→</span>
+                                        <select v-model="block.end" class="field text-sm py-2 flex-1">
+                                            <option value="" disabled>End</option>
+                                            <option v-for="t in boundaryTimes.slice(1)" :key="t" :value="t" :disabled="t <= block.start">{{ t }}</option>
+                                        </select>
+                                        <button @click="removeBlock(bi)" class="w-6 h-6 flex items-center justify-center text-error hover:text-red-400 transition-colors cursor-pointer bg-transparent border-none flex-shrink-0">
+                                            <i class="fas fa-times text-xs"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <button @click="addBlock" class="text-sm text-muted hover:text-white transition-colors cursor-pointer bg-transparent border-none">+ Add Range</button>
                             </div>
+                        </div>
 
-                            <button
-                                @click="addBlock(ti)"
-                                :disabled="boundaryTimes.length < 2"
-                                class="text-sm text-muted hover:text-white transition-colors cursor-pointer bg-transparent border-none disabled:opacity-40 disabled:cursor-not-allowed"
-                            >
-                                + Add Block
-                            </button>
+                        <!-- Tier 2 auto -->
+                        <div class="mb-3 bg-white/[0.03] p-4 rounded-xl border border-white/10 opacity-50">
+                            <div class="flex items-center justify-between">
+                                <span class="font-bold text-sm text-muted">Tier 2</span>
+                                <span class="text-xs px-2 py-0.5 rounded-full bg-white/10 text-muted">Auto</span>
+                            </div>
+                            <p class="text-xs text-muted mt-1.5">Non-overlapping 2-hour blocks, auto-generated when opened.</p>
+                        </div>
+
+                        <!-- Tier 3 auto -->
+                        <div class="bg-white/[0.03] p-4 rounded-xl border border-white/10 opacity-50">
+                            <div class="flex items-center justify-between">
+                                <span class="font-bold text-sm text-muted">Tier 3 — Leftover</span>
+                                <span class="text-xs px-2 py-0.5 rounded-full bg-white/10 text-muted">Auto</span>
+                            </div>
+                            <p class="text-xs text-muted mt-1.5">Remaining 1-hour slots, auto-generated when opened.</p>
                         </div>
                     </div>
 
@@ -200,7 +190,7 @@ export default {
                 startTime: '',
                 endTime: '',
                 slots: [],
-                tiers: [],
+                tier1: { fixedStart: '', fixedEnd: '', blocks: [] },
                 registrationOpenAt: '',
             },
         }
@@ -297,22 +287,11 @@ export default {
             })
         },
 
-        addTier() {
-            const nextTier = this.form.tiers.length
-                ? Math.max(...this.form.tiers.map((t) => t.tier)) + 1
-                : 1
-            this.form.tiers.push({ tier: nextTier, blocks: [] })
+        addBlock() {
+            this.form.tier1.blocks.push({ start: '', end: '' })
         },
-        removeTier(ti) {
-            this.form.tiers.splice(ti, 1)
-            // Renumber remaining tiers
-            this.form.tiers.forEach((t, i) => { t.tier = i + 1 })
-        },
-        addBlock(ti) {
-            this.form.tiers[ti].blocks.push({ start: '', end: '' })
-        },
-        removeBlock(ti, bi) {
-            this.form.tiers[ti].blocks.splice(bi, 1)
+        removeBlock(bi) {
+            this.form.tier1.blocks.splice(bi, 1)
         },
 
         async saveSession() {
@@ -322,16 +301,27 @@ export default {
             if (this.form.slots.length === 0) { alert('Session must have at least one slot.'); return }
             if (!this.form.registrationOpenAt) { alert('Please set the registration opening time.'); return }
 
-            // Validate tier blocks
-            for (const td of this.form.tiers) {
-                for (const b of td.blocks) {
-                    if (!b.start || !b.end) { alert(`Tier ${td.tier} has an incomplete block.`); return }
-                    if (b.end <= b.start) { alert(`Tier ${td.tier}: block end must be after start.`); return }
-                }
+            // Validate Tier 1
+            const t1 = this.form.tier1
+            if (t1.fixedStart && t1.fixedEnd && t1.fixedEnd <= t1.fixedStart) {
+                alert('Tier 1: fixed end must be after fixed start.'); return
+            }
+            for (const b of t1.blocks) {
+                if (!b.start || !b.end) { alert('Tier 1 has an incomplete range.'); return }
+                if (b.end <= b.start) { alert('Tier 1: range end must be after start.'); return }
             }
 
             this.saving = true
             try {
+                const tiers = []
+                if (t1.fixedStart && t1.fixedEnd) {
+                    tiers.push({
+                        tier: 1,
+                        fixedStart: t1.fixedStart,
+                        fixedEnd: t1.fixedEnd,
+                        blocks: t1.blocks.map((b) => ({ start: b.start, end: b.end })),
+                    })
+                }
                 await addDoc(collection(db, 'sessions'), {
                     title: this.form.title.trim(),
                     date: this.form.date,
@@ -343,10 +333,7 @@ export default {
                         capacity: parseInt(s.capacity),
                         price: parseFloat(s.price),
                     })),
-                    tiers: this.form.tiers.map((td) => ({
-                        tier: td.tier,
-                        blocks: td.blocks.map((b) => ({ start: b.start, end: b.end })),
-                    })),
+                    tiers,
                     registrationOpenAt: new Date(this.form.registrationOpenAt),
                     activeTier: 1,
                     bookings: [],

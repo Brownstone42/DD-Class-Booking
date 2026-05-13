@@ -20,10 +20,12 @@ export function generateSlots(startTime, endTime) {
     return slots
 }
 
-// Tier number for a block. Unmapped blocks get (max defined tier + 1).
+// Tier number for a block.
+// Checks the tier-level fixedStart/fixedEnd first, then explicit blocks.
 export function getBlockTier(tiers, blockStart, blockEnd) {
     for (const td of tiers) {
-        for (const b of td.blocks) {
+        if (td.fixedStart === blockStart && td.fixedEnd === blockEnd) return td.tier
+        for (const b of td.blocks || []) {
             if (b.start === blockStart && b.end === blockEnd) return td.tier
         }
     }
@@ -31,7 +33,6 @@ export function getBlockTier(tiers, blockStart, blockEnd) {
 }
 
 // All contiguous sub-blocks that contain every blue tile, ordered longest → shortest.
-// Yellow tiles optionally extend the blue block on either side.
 export function generateSubBlocks(blueStart, blueEnd, yellowStart, yellowEnd) {
     const bsM = toMins(blueStart)
     const beM = toMins(blueEnd)
@@ -64,7 +65,7 @@ export function canConfirmBlock(slots, bookings, blockStart, blockEnd) {
     )
 }
 
-// Best (longest) confirmable sub-block for a user's blue/yellow selection, or null.
+// Best (longest) confirmable sub-block for a Tier 1 selection, or null.
 // Only tries sub-blocks that map to the same tier as the full yellow range.
 export function findBestSubBlock(slots, bookings, blueStart, blueEnd, yellowStart, yellowEnd, tiers = []) {
     const preferredTier = getBlockTier(tiers, yellowStart, yellowEnd)
@@ -81,6 +82,50 @@ export function calcBlockPrice(slots, blockStart, blockEnd) {
     return slots
         .filter((s) => s.startTime >= blockStart && s.endTime <= blockEnd)
         .reduce((sum, s) => sum + s.price, 0)
+}
+
+// Auto-generate non-overlapping 2-hour Tier 2 blocks from slots with remaining capacity.
+// Returns { blocks: [{start, end}], consumedIndices: Set<number> }
+export function generateTier2Blocks(slots, bookings) {
+    const blocks = []
+    const consumedIndices = new Set()
+    let i = 0
+    while (i < slots.length) {
+        if (i + 1 < slots.length) {
+            const s1 = slots[i]
+            const s2 = slots[i + 1]
+            const r1 = s1.capacity - getSlotLoad(bookings, s1.startTime, s1.endTime)
+            const r2 = s2.capacity - getSlotLoad(bookings, s2.startTime, s2.endTime)
+            if (r1 > 0 && r2 > 0) {
+                blocks.push({ start: s1.startTime, end: s2.endTime })
+                consumedIndices.add(i)
+                consumedIndices.add(i + 1)
+                i += 2
+                continue
+            }
+        }
+        i++
+    }
+    return { blocks, consumedIndices }
+}
+
+// Auto-generate Tier 3 leftover blocks: 1-hour slots not consumed by Tier 2 with remaining capacity.
+export function generateTier3Blocks(slots, bookings, consumedIndices) {
+    return slots
+        .filter((_, i) => !consumedIndices.has(i))
+        .filter((s) => s.capacity - getSlotLoad(bookings, s.startTime, s.endTime) > 0)
+        .map((s) => ({ start: s.startTime, end: s.endTime }))
+}
+
+// Derive which slot indices were consumed by stored Tier 2 blocks
+export function getConsumedIndicesFromTier2(slots, tier2Blocks) {
+    const consumed = new Set()
+    for (const block of tier2Blocks) {
+        slots.forEach((s, i) => {
+            if (s.startTime >= block.start && s.endTime <= block.end) consumed.add(i)
+        })
+    }
+    return consumed
 }
 
 // Tier numbers that are currently active (≤ activeTier), sorted ascending

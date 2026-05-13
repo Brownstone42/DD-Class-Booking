@@ -114,37 +114,61 @@
 
                     <!-- Tier configuration -->
                     <div class="border border-white/10 rounded-xl p-5">
-                        <div class="flex justify-between items-center mb-4">
+                        <div class="mb-4">
                             <h3 class="text-base font-semibold">Priority Tiers</h3>
-                            <button @click="addTier" class="inline-flex items-center gap-1.5 border border-white/10 text-white text-sm px-3 py-1.5 rounded-lg hover:bg-white/5 transition-colors cursor-pointer bg-transparent">
-                                <i class="fas fa-plus"></i> Tier
-                            </button>
+                            <p class="text-xs text-muted mt-0.5">Tier 1 books immediately. Tier 2 &amp; 3 are auto-generated when opened.</p>
                         </div>
-                        <div v-if="form.tiers.length === 0" class="text-muted text-sm text-center py-4">
-                            No tiers configured — all bookings treated equally.
-                        </div>
-                        <div v-for="(tierDef, ti) in form.tiers" :key="ti" class="mb-4 bg-white/[0.03] p-4 rounded-xl border border-white/10">
-                            <div class="flex items-center justify-between mb-3">
-                                <span class="font-bold text-sm text-primary">Tier {{ tierDef.tier }}</span>
-                                <button @click="removeTier(ti)" class="text-xs text-error hover:text-red-400 transition-colors cursor-pointer bg-transparent border-none">Remove Tier</button>
-                            </div>
-                            <div class="grid gap-2 mb-3">
-                                <div v-for="(block, bi) in tierDef.blocks" :key="bi" class="flex items-center gap-2">
-                                    <select v-model="block.start" class="field text-sm py-2 flex-1">
-                                        <option value="" disabled>Start</option>
+                        <!-- Tier 1 -->
+                        <div class="mb-3 bg-white/[0.03] p-4 rounded-xl border border-white/10">
+                            <span class="font-bold text-sm text-primary block mb-3">Tier 1</span>
+                            <div v-if="boundaryTimes.length < 2" class="text-xs text-muted">Set session time first.</div>
+                            <div v-else>
+                                <label class="block text-xs text-muted mb-1.5">Fixed period (always blue — users cannot change)</label>
+                                <div class="flex items-center gap-2 mb-4">
+                                    <select v-model="form.tier1.fixedStart" class="field text-sm py-2 flex-1">
+                                        <option value="" disabled>Fixed Start</option>
                                         <option v-for="t in boundaryTimes.slice(0, -1)" :key="t" :value="t">{{ t }}</option>
                                     </select>
-                                    <span class="text-muted text-sm">→</span>
-                                    <select v-model="block.end" class="field text-sm py-2 flex-1">
-                                        <option value="" disabled>End</option>
-                                        <option v-for="t in boundaryTimes.slice(1)" :key="t" :value="t" :disabled="t <= block.start">{{ t }}</option>
+                                    <span class="text-muted text-sm flex-shrink-0">→</span>
+                                    <select v-model="form.tier1.fixedEnd" class="field text-sm py-2 flex-1">
+                                        <option value="" disabled>Fixed End</option>
+                                        <option v-for="t in boundaryTimes.slice(1)" :key="t" :value="t" :disabled="t <= form.tier1.fixedStart">{{ t }}</option>
                                     </select>
-                                    <button @click="removeBlock(ti, bi)" class="w-6 h-6 flex items-center justify-center text-error hover:text-red-400 transition-colors cursor-pointer bg-transparent border-none flex-shrink-0">
-                                        <i class="fas fa-times text-xs"></i>
-                                    </button>
                                 </div>
+                                <label class="block text-xs text-muted mb-1.5">Allowed booking ranges (users can extend yellow up to these)</label>
+                                <div class="grid gap-2 mb-3">
+                                    <div v-for="(block, bi) in form.tier1.blocks" :key="bi" class="flex items-center gap-2">
+                                        <select v-model="block.start" class="field text-sm py-2 flex-1">
+                                            <option value="" disabled>Start</option>
+                                            <option v-for="t in boundaryTimes.slice(0, -1)" :key="t" :value="t">{{ t }}</option>
+                                        </select>
+                                        <span class="text-muted text-sm flex-shrink-0">→</span>
+                                        <select v-model="block.end" class="field text-sm py-2 flex-1">
+                                            <option value="" disabled>End</option>
+                                            <option v-for="t in boundaryTimes.slice(1)" :key="t" :value="t" :disabled="t <= block.start">{{ t }}</option>
+                                        </select>
+                                        <button @click="removeBlock(bi)" class="w-6 h-6 flex items-center justify-center text-error hover:text-red-400 transition-colors cursor-pointer bg-transparent border-none flex-shrink-0">
+                                            <i class="fas fa-times text-xs"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <button @click="addBlock" class="text-sm text-muted hover:text-white transition-colors cursor-pointer bg-transparent border-none">+ Add Range</button>
                             </div>
-                            <button @click="addBlock(ti)" class="text-sm text-muted hover:text-white transition-colors cursor-pointer bg-transparent border-none">+ Add Block</button>
+                        </div>
+                        <!-- Tier 2/3 auto badges -->
+                        <div class="mb-3 bg-white/[0.03] p-4 rounded-xl border border-white/10 opacity-50">
+                            <div class="flex items-center justify-between">
+                                <span class="font-bold text-sm text-muted">Tier 2</span>
+                                <span class="text-xs px-2 py-0.5 rounded-full bg-white/10 text-muted">Auto</span>
+                            </div>
+                            <p class="text-xs text-muted mt-1.5">Non-overlapping 2-hour blocks, auto-generated when opened.</p>
+                        </div>
+                        <div class="bg-white/[0.03] p-4 rounded-xl border border-white/10 opacity-50">
+                            <div class="flex items-center justify-between">
+                                <span class="font-bold text-sm text-muted">Tier 3 — Leftover</span>
+                                <span class="text-xs px-2 py-0.5 rounded-full bg-white/10 text-muted">Auto</span>
+                            </div>
+                            <p class="text-xs text-muted mt-1.5">Remaining 1-hour slots, auto-generated when opened.</p>
                         </div>
                     </div>
 
@@ -237,7 +261,11 @@ import 'flatpickr/dist/themes/dark.css'
 import { auth, db } from '../firebase'
 import { onAuthStateChanged } from 'firebase/auth'
 import { doc, onSnapshot, updateDoc, runTransaction } from 'firebase/firestore'
-import { generateSlots, toMins, toTime, findAllPromotions, calcBlockPrice } from '../utils/booking'
+import {
+    generateSlots, toMins, toTime,
+    findAllPromotions, calcBlockPrice,
+    generateTier2Blocks, generateTier3Blocks, getConsumedIndicesFromTier2,
+} from '../utils/booking'
 
 export default {
     name: 'AdminSessionView',
@@ -257,7 +285,7 @@ export default {
                 startTime: '',
                 endTime: '',
                 slots: [],
-                tiers: [],
+                tier1: { fixedStart: '', fixedEnd: '', blocks: [] },
                 registrationOpenAt: '',
             },
         }
@@ -287,11 +315,8 @@ export default {
                 })
         },
         hasMoreTiers() {
-            if (!this.session) return false
-            const maxDefined = this.session.tiers?.length
-                ? Math.max(...this.session.tiers.map((t) => t.tier))
-                : 0
-            return this.session.activeTier <= maxDefined
+            if (!this.session || this.session.isTerminated) return false
+            return this.session.activeTier < 3
         },
     },
     created() {
@@ -346,10 +371,14 @@ export default {
                 startTime: session.startTime,
                 endTime: session.endTime,
                 slots: session.slots.map((s) => ({ ...s })),
-                tiers: (session.tiers || []).map((td) => ({
-                    tier: td.tier,
-                    blocks: td.blocks.map((b) => ({ ...b })),
-                })),
+                tier1: (() => {
+                    const t1 = (session.tiers || []).find((td) => td.tier === 1)
+                    return {
+                        fixedStart: t1?.fixedStart ?? '',
+                        fixedEnd: t1?.fixedEnd ?? '',
+                        blocks: (t1?.blocks || []).map((b) => ({ ...b })),
+                    }
+                })(),
                 registrationOpenAt: this.timestampToLocal(session.registrationOpenAt),
             }
         },
@@ -415,16 +444,8 @@ export default {
             })
         },
 
-        addTier() {
-            const next = this.form.tiers.length ? Math.max(...this.form.tiers.map((t) => t.tier)) + 1 : 1
-            this.form.tiers.push({ tier: next, blocks: [] })
-        },
-        removeTier(ti) {
-            this.form.tiers.splice(ti, 1)
-            this.form.tiers.forEach((t, i) => { t.tier = i + 1 })
-        },
-        addBlock(ti) { this.form.tiers[ti].blocks.push({ start: '', end: '' }) },
-        removeBlock(ti, bi) { this.form.tiers[ti].blocks.splice(bi, 1) },
+        addBlock() { this.form.tier1.blocks.push({ start: '', end: '' }) },
+        removeBlock(bi) { this.form.tier1.blocks.splice(bi, 1) },
 
         formatDate(dateStr) {
             if (!dateStr) return ''
@@ -455,10 +476,7 @@ export default {
                         capacity: parseInt(s.capacity),
                         price: parseFloat(s.price),
                     })),
-                    tiers: this.form.tiers.map((td) => ({
-                        tier: td.tier,
-                        blocks: td.blocks.map((b) => ({ start: b.start, end: b.end })),
-                    })),
+                    tiers: this._buildTiers(this.form.tier1, this.session.tiers || []),
                     registrationOpenAt: new Date(this.form.registrationOpenAt),
                 })
             } catch (err) {
@@ -468,9 +486,24 @@ export default {
             }
         },
 
+        _buildTiers(tier1Form, existingTiers) {
+            // Preserve auto-generated Tier 2/3, replace Tier 1 from form
+            const autoTiers = existingTiers.filter((t) => t.tier !== 1)
+            const tiers = []
+            if (tier1Form.fixedStart && tier1Form.fixedEnd) {
+                tiers.push({
+                    tier: 1,
+                    fixedStart: tier1Form.fixedStart,
+                    fixedEnd: tier1Form.fixedEnd,
+                    blocks: tier1Form.blocks.map((b) => ({ start: b.start, end: b.end })),
+                })
+            }
+            return [...tiers, ...autoTiers]
+        },
+
         async openNextTier() {
             const newTier = this.session.activeTier + 1
-            if (!confirm(`Open Tier ${newTier}? This will automatically promote eligible waitlisted users.`)) return
+            if (!confirm(`Open Tier ${newTier}? This will auto-generate blocks and promote eligible waitlisted users.`)) return
             this.processing = true
             try {
                 const sessionRef = doc(db, 'sessions', this.session.id)
@@ -478,10 +511,27 @@ export default {
                 await runTransaction(db, async (tx) => {
                     const snap = await tx.get(sessionRef)
                     const s = { id: snap.id, ...snap.data() }
-                    const updatedSession = { ...s, activeTier: newTier }
+                    let newTierDef = null
+
+                    if (newTier === 2) {
+                        const { blocks } = generateTier2Blocks(s.slots, s.bookings || [])
+                        newTierDef = { tier: 2, blocks }
+                    } else if (newTier === 3) {
+                        const tier2 = (s.tiers || []).find((t) => t.tier === 2)
+                        const consumed = getConsumedIndicesFromTier2(s.slots, tier2?.blocks || [])
+                        const blocks = generateTier3Blocks(s.slots, s.bookings || [], consumed)
+                        newTierDef = { tier: 3, blocks }
+                    }
+
+                    const updatedTiers = [
+                        ...(s.tiers || []).filter((t) => t.tier !== newTier),
+                        ...(newTierDef ? [newTierDef] : []),
+                    ]
+                    const updatedSession = { ...s, activeTier: newTier, tiers: updatedTiers }
                     const promotions = findAllPromotions(updatedSession)
                     promotedCount = promotions.length
-                    let bookings = [...s.bookings]
+
+                    let bookings = [...(s.bookings || [])]
                     for (const promo of promotions) {
                         const promotedEmail = bookings.find((b) => b.id === promo.bookingId)?.email
                         bookings = bookings.map((b) =>
@@ -495,7 +545,7 @@ export default {
                             )
                         }
                     }
-                    tx.update(sessionRef, { activeTier: newTier, bookings })
+                    tx.update(sessionRef, { activeTier: newTier, tiers: updatedTiers, bookings })
                 })
                 alert(`Tier ${newTier} opened. ${promotedCount} booking${promotedCount !== 1 ? 's' : ''} promoted.`)
             } catch (err) {
