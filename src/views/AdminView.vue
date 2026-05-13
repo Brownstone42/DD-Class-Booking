@@ -1,72 +1,71 @@
 <template>
-    <div class="admin-view fade-in">
-        <!-- Unauthenticated State -->
-        <div v-if="!authChecked" class="glass" style="text-align: center; padding: 3rem">
-            <div class="loader-sm" style="margin: 0 auto"></div>
-            <p style="margin-top: 1rem; color: var(--text-muted)">Verifying permissions...</p>
+    <div class="fade-in">
+        <!-- Auth loading -->
+        <div
+            v-if="!authChecked"
+            class="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-12 text-center"
+        >
+            <div
+                class="w-6 h-6 rounded-full border-2 border-white/10 border-t-primary animate-spin mx-auto"
+            ></div>
+            <p class="mt-4 text-muted">Verifying permissions...</p>
         </div>
 
-        <!-- Access Denied State -->
-        <div v-else-if="!isAdmin" class="glass" style="text-align: center; padding: 3rem">
-            <div style="font-size: 4rem; margin-bottom: 1rem">🚫</div>
-            <h2>Access Denied</h2>
-            <p style="color: var(--text-muted); margin-top: 1rem">
-                Sorry, only authorized coaches can access this page.
-            </p>
-            <router-link to="/" class="btn btn-outline" style="margin-top: 2rem">
+        <!-- Access denied -->
+        <div
+            v-else-if="!isAdmin"
+            class="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-12 text-center"
+        >
+            <div class="text-6xl mb-4">🚫</div>
+            <h2 class="text-2xl font-bold">Access Denied</h2>
+            <p class="text-muted mt-3">Sorry, only authorized coaches can access this page.</p>
+            <router-link
+                to="/"
+                class="inline-flex items-center gap-2 mt-8 border border-white/10 text-white px-6 py-3 rounded-xl hover:bg-white/5 transition-colors"
+            >
                 Go Back Home
             </router-link>
         </div>
 
-        <!-- Admin Content -->
-        <div v-else class="admin-content">
-            <header style="margin-bottom: 2rem">
-                <h1>Coach Dashboard</h1>
-                <p style="color: var(--text-muted)">Welcome back, {{ user.displayName }}</p>
+        <!-- Admin content -->
+        <div v-else>
+            <header class="mb-8">
+                <h1 class="text-3xl font-bold">Coach Dashboard</h1>
+                <p class="text-muted mt-1">Welcome back, {{ user.displayName }}</p>
             </header>
 
-            <div class="glass session-form">
-                <h2 style="margin-bottom: 1.5rem">
-                    <i class="fas fa-plus-circle" style="color: var(--primary)"></i> Setup New
-                    Session
+            <div class="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6 md:p-8">
+                <h2 class="text-xl font-bold mb-6">
+                    <i class="fas fa-plus-circle text-primary mr-2"></i>
+                    {{ editingId ? 'Edit Session' : 'Setup New Session' }}
                 </h2>
 
-                <div class="form-grid" style="display: grid; gap: 1.5rem">
-                    <div class="form-group">
-                        <label>Session Title</label>
+                <div class="grid gap-6">
+                    <!-- Title -->
+                    <div>
+                        <label class="block mb-2 font-semibold text-sm">Session Title</label>
                         <input
                             type="text"
                             v-model="form.title"
                             placeholder="e.g. Friday Tennis Night"
+                            class="field"
                         />
                     </div>
 
-                    <div class="form-group">
-                        <label>Session Date</label>
-                        <VueDatePicker
-                            v-model="form.date"
-                            :enable-time-picker="false"
-                            :formats="{ input: 'dd-MM-yyyy' }"
-                            dark
-                            placeholder="Select date"
-                            auto-apply
-                        />
+                    <!-- Date -->
+                    <div>
+                        <label class="block mb-2 font-semibold text-sm">Session Date</label>
+                        <input ref="dateInput" type="text" class="field" placeholder="dd/mm/yyyy" />
                     </div>
 
-                    <div
-                        class="slots-section"
-                        style="padding: 1rem; border: 1px solid var(--glass-border); border-radius: 12px"
-                    >
-                        <div
-                            style="
-                                display: flex;
-                                justify-content: space-between;
-                                align-items: center;
-                                margin-bottom: 1rem;
-                            "
-                        >
-                            <h3 style="font-size: 1.1rem">Time Slots</h3>
-                            <button @click="addSlot" class="btn btn-outline" style="padding: 0.5rem 1rem">
+                    <!-- Slots -->
+                    <div class="border border-white/10 rounded-xl p-5">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-base font-semibold">Time Slots</h3>
+                            <button
+                                @click="addSlot"
+                                class="inline-flex items-center gap-1.5 border border-white/10 text-white text-sm px-3 py-1.5 rounded-lg hover:bg-white/5 transition-colors cursor-pointer bg-transparent"
+                            >
                                 <i class="fas fa-plus"></i> Slot
                             </button>
                         </div>
@@ -74,145 +73,126 @@
                         <div
                             v-for="(slot, index) in form.slots"
                             :key="index"
-                            class="slot-card"
-                            style="
-                                background: rgba(255, 255, 255, 0.03);
-                                padding: 1.2rem;
-                                border-radius: 12px;
-                                margin-bottom: 1.2rem;
-                                position: relative;
-                                border-left: 4px solid var(--primary);
-                            "
+                            class="relative bg-white/[0.03] p-5 rounded-xl mb-4 border-l-4 border-l-primary border border-white/10"
                         >
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem">
-                                <div class="form-group">
-                                    <label>Start Time</label>
-                                    <VueDatePicker
+                            <div class="grid grid-cols-2 gap-4 mb-4">
+                                <div>
+                                    <label class="block mb-2 font-semibold text-sm"
+                                        >Start Time</label
+                                    >
+                                    <input
+                                        type="time"
                                         v-model="slot.startTime"
-                                        time-picker
-                                        dark
-                                        placeholder="Start"
-                                        :time-config="{ minutesIncrement: 15 }"
-                                        auto-apply
+                                        step="900"
+                                        class="field"
                                     />
                                 </div>
-                                <div class="form-group">
-                                    <label>End Time</label>
-                                    <VueDatePicker
+                                <div>
+                                    <label class="block mb-2 font-semibold text-sm"
+                                        >End Time</label
+                                    >
+                                    <input
+                                        type="time"
                                         v-model="slot.endTime"
-                                        time-picker
-                                        dark
-                                        placeholder="End"
-                                        :time-config="{ minutesIncrement: 15 }"
-                                        auto-apply
+                                        step="900"
+                                        class="field"
                                     />
                                 </div>
                             </div>
 
-                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem">
-                                <div class="form-group">
-                                    <label>Capacity</label>
-                                    <input type="number" v-model="slot.capacity" min="1" />
+                            <div class="grid grid-cols-3 gap-4">
+                                <div>
+                                    <label class="block mb-2 font-semibold text-sm"
+                                        >Capacity</label
+                                    >
+                                    <input
+                                        type="number"
+                                        v-model="slot.capacity"
+                                        min="1"
+                                        class="field"
+                                    />
                                 </div>
-                                <div class="form-group">
-                                    <label>Price (THB)</label>
-                                    <input type="number" v-model="slot.price" min="0" />
+                                <div>
+                                    <label class="block mb-2 font-semibold text-sm"
+                                        >Price (THB)</label
+                                    >
+                                    <input
+                                        type="number"
+                                        v-model="slot.price"
+                                        min="0"
+                                        class="field"
+                                    />
                                 </div>
-                                <div class="form-group">
-                                    <label>Group</label>
+                                <div>
+                                    <label class="block mb-2 font-semibold text-sm">Group</label>
                                     <input
                                         type="text"
                                         v-model="slot.group"
                                         placeholder="e.g. A"
-                                        style="text-transform: uppercase"
+                                        class="field uppercase"
                                     />
                                 </div>
                             </div>
-                            <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.5rem">
+                            <p class="text-[0.7rem] text-muted mt-2">
                                 *Slots with the same group cannot be booked together.
                             </p>
 
+                            <!-- Remove slot -->
                             <button
                                 v-if="form.slots.length > 1"
                                 @click="removeSlot(index)"
-                                style="
-                                    position: absolute;
-                                    top: -10px;
-                                    right: -10px;
-                                    background: var(--error);
-                                    color: white;
-                                    border: none;
-                                    border-radius: 50%;
-                                    width: 24px;
-                                    height: 24px;
-                                    cursor: pointer;
-                                    display: flex;
-                                    align-items: center;
-                                    justify-content: center;
-                                    z-index: 1;
-                                "
+                                class="absolute -top-3 -right-3 w-6 h-6 bg-error text-white rounded-full flex items-center justify-center cursor-pointer border-none text-xs hover:bg-red-400 transition-colors z-10"
                             >
                                 <i class="fas fa-times"></i>
                             </button>
                         </div>
                     </div>
 
-                    <div
-                        class="form-group"
-                        style="
-                            padding: 1.5rem;
-                            background: rgba(192, 255, 0, 0.05);
-                            border: 1px solid var(--primary);
-                            border-radius: 12px;
-                        "
-                    >
-                        <label style="color: var(--primary); font-weight: 700"
+                    <!-- Registration opening time -->
+                    <div class="p-5 bg-primary/5 border border-primary rounded-xl">
+                        <label class="block mb-1 font-bold text-sm text-primary"
                             >Registration Opening Time</label
                         >
-                        <p
-                            style="
-                                font-size: 0.8rem;
-                                color: var(--text-muted);
-                                margin-bottom: 0.8rem;
-                            "
-                        >
+                        <p class="text-xs text-muted mb-3">
                             When should people be able to start booking?
                         </p>
-                        <VueDatePicker
-                            v-model="form.registrationOpenAt"
-                            :formats="{ input: 'dd-MM-yyyy HH:mm' }"
-                            dark
-                            placeholder="Select date and time"
-                            auto-apply
-                        />
+                        <input ref="dtInput" type="text" class="field" placeholder="dd/mm/yyyy HH:MM" />
                     </div>
 
+                    <!-- Submit -->
                     <div v-if="!editingId">
                         <button
                             @click="saveSession"
-                            class="btn btn-primary"
                             :disabled="saving"
-                            style="width: 100%; padding: 1.2rem"
+                            class="w-full py-4 bg-primary text-black font-bold rounded-xl hover:-translate-y-0.5 hover:shadow-[0_8px_20px_rgba(192,255,0,0.3)] transition-all cursor-pointer border-none disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0"
                         >
-                            <i v-if="saving" class="loader-sm"></i>
+                            <span v-if="saving">
+                                <span
+                                    class="inline-block w-4 h-4 rounded-full border-2 border-black/20 border-t-black animate-spin align-middle mr-2"
+                                ></span>
+                                Saving...
+                            </span>
                             <span v-else>Create Session</span>
                         </button>
                     </div>
-                    <div v-else style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem">
+                    <div v-else class="grid grid-cols-2 gap-4">
                         <button
                             @click="$router.push('/')"
-                            class="btn btn-outline"
-                            style="padding: 1.2rem"
+                            class="py-4 border border-white/10 text-white bg-transparent rounded-xl hover:bg-white/5 transition-colors cursor-pointer font-semibold"
                         >
                             Cancel
                         </button>
                         <button
                             @click="updateSession"
-                            class="btn btn-primary"
                             :disabled="saving"
-                            style="padding: 1.2rem"
+                            class="py-4 bg-primary text-black font-bold rounded-xl hover:-translate-y-0.5 hover:shadow-[0_8px_20px_rgba(192,255,0,0.3)] transition-all cursor-pointer border-none disabled:opacity-60 disabled:cursor-not-allowed"
                         >
-                            <i v-if="saving" class="loader-sm"></i>
+                            <span v-if="saving">
+                                <span
+                                    class="inline-block w-4 h-4 rounded-full border-2 border-black/20 border-t-black animate-spin align-middle mr-2"
+                                ></span>
+                                Saving...
+                            </span>
                             <span v-else>Update Session</span>
                         </button>
                     </div>
@@ -223,15 +203,24 @@
 </template>
 
 <script>
-import { VueDatePicker } from '@vuepic/vue-datepicker'
-import '@vuepic/vue-datepicker/dist/main.css'
+import flatpickr from 'flatpickr'
+import 'flatpickr/dist/themes/dark.css'
 import { auth, db } from '../firebase'
 import { onAuthStateChanged } from 'firebase/auth'
-import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, getDoc, updateDoc } from 'firebase/firestore'
+import {
+    collection,
+    addDoc,
+    serverTimestamp,
+    query,
+    where,
+    getDocs,
+    doc,
+    getDoc,
+    updateDoc,
+} from 'firebase/firestore'
 
 export default {
     name: 'AdminView',
-    components: { VueDatePicker },
     data() {
         return {
             user: null,
@@ -241,18 +230,9 @@ export default {
             editingId: null,
             form: {
                 title: '',
-                date: null,
-                slots: [
-                    {
-                        startTime: { hours: 18, minutes: 0 },
-                        endTime: { hours: 20, minutes: 0 },
-                        capacity: 8,
-                        price: 300,
-                        group: '',
-                        isActive: true,
-                    },
-                ],
-                registrationOpenAt: null,
+                date: '',
+                slots: [this.blankSlot()],
+                registrationOpenAt: '',
             },
         }
     },
@@ -262,49 +242,90 @@ export default {
         },
     },
     async created() {
-        onAuthStateChanged(auth, (user) => {
+        this.unsubscribeAuth = onAuthStateChanged(auth, (user) => {
             this.user = user
             this.authChecked = true
         })
-
         const editId = this.$route.query.edit
         if (editId) {
             this.editingId = editId
             await this.loadSession(editId)
         }
     },
+    beforeUnmount() {
+        this.unsubscribeAuth?.()
+        this._fpDate?.destroy()
+        this._fpDT?.destroy()
+    },
+    watch: {
+        // Init flatpickr only after auth resolves and the form DOM is rendered
+        authChecked(val) {
+            if (val && this.isAdmin) {
+                this.$nextTick(() => this.initFlatpickr())
+            }
+        },
+        // Sync async-loaded edit data into flatpickr after init
+        'form.date'(val) {
+            if (this._fpDate) val ? this._fpDate.setDate(new Date(val + 'T00:00:00'), false) : this._fpDate.clear()
+        },
+        'form.registrationOpenAt'(val) {
+            if (this._fpDT) val ? this._fpDT.setDate(new Date(val), false) : this._fpDT.clear()
+        },
+    },
     methods: {
-        addSlot() {
-            this.form.slots.push({
-                startTime: { hours: 18, minutes: 0 },
-                endTime: { hours: 20, minutes: 0 },
-                capacity: 8,
-                price: 300,
-                group: '',
-                isActive: true,
+        initFlatpickr() {
+            const pad = (n) => String(n).padStart(2, '0')
+            this._fpDate = flatpickr(this.$refs.dateInput, {
+                dateFormat: 'd/m/Y',
+                onChange: ([date]) => {
+                    if (!date) { this.form.date = ''; return }
+                    this.form.date = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+                },
             })
+            this._fpDT = flatpickr(this.$refs.dtInput, {
+                enableTime: true,
+                dateFormat: 'd/m/Y H:i',
+                minuteIncrement: 15,
+                onChange: ([date]) => {
+                    if (!date) { this.form.registrationOpenAt = ''; return }
+                    this.form.registrationOpenAt = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+                },
+            })
+            // Sync values already loaded by loadSession (edit mode)
+            if (this.form.date) this._fpDate.setDate(new Date(this.form.date + 'T00:00:00'), false)
+            if (this.form.registrationOpenAt) this._fpDT.setDate(new Date(this.form.registrationOpenAt), false)
+        },
+        blankSlot() {
+            return { startTime: '18:00', endTime: '20:00', capacity: 8, price: 300, group: '', isActive: true }
+        },
+        addSlot() {
+            this.form.slots.push(this.blankSlot())
         },
         removeSlot(index) {
             this.form.slots.splice(index, 1)
         },
+        timestampToLocalInput(ts) {
+            const d = ts.toDate()
+            const pad = (n) => String(n).padStart(2, '0')
+            return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+        },
         async loadSession(id) {
             try {
-                const docRef = doc(db, 'courses', id)
-                const docSnap = await getDoc(docRef)
+                const docSnap = await getDoc(doc(db, 'courses', id))
                 if (docSnap.exists()) {
                     const data = docSnap.data()
                     this.form = {
                         title: data.title,
-                        date: new Date(data.date),
-                        registrationOpenAt: data.registrationOpenAt.toDate(),
-                        slots: data.slots.map(s => ({
-                            startTime: this.parseTime(s.startTime),
-                            endTime: this.parseTime(s.endTime),
+                        date: data.date,
+                        registrationOpenAt: this.timestampToLocalInput(data.registrationOpenAt),
+                        slots: data.slots.map((s) => ({
+                            startTime: s.startTime,
+                            endTime: s.endTime,
                             capacity: s.capacity,
                             price: s.price,
                             group: s.group,
-                            isActive: s.isActive
-                        }))
+                            isActive: s.isActive,
+                        })),
                     }
                 }
             } catch (error) {
@@ -312,140 +333,49 @@ export default {
                 alert('Failed to load session data')
             }
         },
-        parseTime(timeStr) {
-            const [hours, minutes] = timeStr.split(':').map(Number)
-            return { hours, minutes }
-        },
-        async updateSession() {
-            if (!this.form.title || !this.form.date || !this.form.registrationOpenAt) {
-                alert('Please fill all required fields.')
-                return
-            }
-
-            this.saving = true
-            try {
-                const dateObj = new Date(this.form.date)
-                const dateStr = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`
-
-                const processedSlots = this.form.slots.map((slot, idx) => {
-                    const formatTime = (t) => {
-                        if (t instanceof Date) {
-                            return `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`
-                        } else if (t && typeof t === 'object' && 'hours' in t) {
-                            return `${String(t.hours).padStart(2, '0')}:${String(t.minutes).padStart(2, '0')}`
-                        }
-                        return t // fallback
-                    }
-
-                    // Keep existing ID and data if editing, or create new
-                    // Wait, we should probably keep the ID if we are editing.
-                    // But processing them again is fine as long as we match the structure.
-                    // However, we must preserve attendees/waitlist!
-                    
-                    return {
-                        ...slot,
-                        startTime: formatTime(slot.startTime),
-                        endTime: formatTime(slot.endTime),
-                        capacity: parseInt(slot.capacity),
-                        price: parseFloat(slot.price),
-                        group: slot.group ? slot.group.toUpperCase() : '',
-                    }
-                })
-
-                // When updating, we must NOT overwrite attendees/waitlist.
-                // So we need to fetch the current doc again to merge or use transactional update.
-                // For simplicity here, let's fetch current slots first.
-                const docRef = doc(db, 'courses', this.editingId)
-                const currentDoc = await getDoc(docRef)
-                const currentSlots = currentDoc.data().slots
-
-                const finalSlots = processedSlots.map((newSlot, idx) => {
-                    const existingSlot = currentSlots[idx] 
-                    return {
-                        ...newSlot,
-                        id: existingSlot ? existingSlot.id : `slot_${Date.now()}_${idx}`,
-                        attendees: existingSlot ? existingSlot.attendees : [],
-                        waitlist: existingSlot ? existingSlot.waitlist : [],
-                        isActive: newSlot.isActive !== undefined ? newSlot.isActive : true
-                    }
-                })
-
-                await updateDoc(docRef, {
-                    title: this.form.title,
-                    date: dateStr,
-                    slots: finalSlots,
-                    registrationOpenAt: new Date(this.form.registrationOpenAt),
-                })
-
-                alert('Session updated successfully!')
-                this.$router.push('/')
-            } catch (error) {
-                console.error('Error updating session:', error)
-                alert('Failed to update session: ' + error.message)
-            } finally {
-                this.saving = false
-            }
-        },
         async saveSession() {
             if (!this.form.title || !this.form.date || !this.form.registrationOpenAt) {
                 alert('Please fill all required fields.')
                 return
             }
-
+            if (this.form.slots.some((s) => !s.startTime || !s.endTime)) {
+                alert('Please fill in start and end times for all slots.')
+                return
+            }
             this.saving = true
             try {
-                // Formatting date for comparison
-                const dateObj = new Date(this.form.date)
-                const dateStr = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`
-
-                // --- NEW: Duplicate Date Check ---
                 const q = query(
                     collection(db, 'courses'),
-                    where('date', '==', dateStr),
-                    where('isTerminated', '==', false)
+                    where('date', '==', this.form.date),
+                    where('isTerminated', '==', false),
                 )
-                const querySnapshot = await getDocs(q)
-                if (!querySnapshot.empty) {
-                    alert(`Error: A session for ${dateStr} already exists and is active. Please terminate it before creating a new one.`)
-                    this.saving = false
+                const existing = await getDocs(q)
+                if (!existing.empty) {
+                    alert(
+                        `Error: A session for ${this.form.date} already exists. Terminate it before creating a new one.`,
+                    )
                     return
                 }
-                // ----------------------------------
-
-                // Process Slots
-                const processedSlots = this.form.slots.map((slot, idx) => {
-                    const formatTime = (t) => {
-                        if (t instanceof Date) {
-                            return `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`
-                        } else if (t && typeof t === 'object' && 'hours' in t) {
-                            return `${String(t.hours).padStart(2, '0')}:${String(t.minutes).padStart(2, '0')}`
-                        }
-                        throw new Error(`Invalid Time Format in Slot ${idx + 1}`)
-                    }
-
-                    return {
-                        id: `slot_${Date.now()}_${idx}`,
-                        startTime: formatTime(slot.startTime),
-                        endTime: formatTime(slot.endTime),
-                        capacity: parseInt(slot.capacity),
-                        price: parseFloat(slot.price),
-                        group: slot.group ? slot.group.toUpperCase() : '',
-                        isActive: true,
-                        attendees: [],
-                        waitlist: [],
-                    }
-                })
-
+                const processedSlots = this.form.slots.map((slot, idx) => ({
+                    id: `slot_${Date.now()}_${idx}`,
+                    startTime: slot.startTime,
+                    endTime: slot.endTime,
+                    capacity: parseInt(slot.capacity),
+                    price: parseFloat(slot.price),
+                    group: slot.group ? slot.group.toUpperCase() : '',
+                    isActive: true,
+                    attendees: [],
+                    waitlist: [],
+                }))
                 await addDoc(collection(db, 'courses'), {
                     title: this.form.title,
-                    date: dateStr,
+                    date: this.form.date,
                     slots: processedSlots,
                     registrationOpenAt: new Date(this.form.registrationOpenAt),
                     isTerminated: false,
                     createdAt: serverTimestamp(),
                     createdBy: this.user.email,
                 })
-
                 alert('Session created successfully!')
                 this.$router.push('/')
             } catch (error) {
@@ -455,50 +385,93 @@ export default {
                 this.saving = false
             }
         },
+        async updateSession() {
+            if (!this.form.title || !this.form.date || !this.form.registrationOpenAt) {
+                alert('Please fill all required fields.')
+                return
+            }
+            this.saving = true
+            try {
+                const docRef = doc(db, 'courses', this.editingId)
+                const currentDoc = await getDoc(docRef)
+                const currentSlots = currentDoc.data().slots
+                const finalSlots = this.form.slots.map((slot, idx) => {
+                    const existing = currentSlots[idx]
+                    return {
+                        id: existing ? existing.id : `slot_${Date.now()}_${idx}`,
+                        startTime: slot.startTime,
+                        endTime: slot.endTime,
+                        capacity: parseInt(slot.capacity),
+                        price: parseFloat(slot.price),
+                        group: slot.group ? slot.group.toUpperCase() : '',
+                        isActive: slot.isActive !== undefined ? slot.isActive : true,
+                        attendees: existing ? existing.attendees : [],
+                        waitlist: existing ? existing.waitlist : [],
+                    }
+                })
+                await updateDoc(docRef, {
+                    title: this.form.title,
+                    date: this.form.date,
+                    slots: finalSlots,
+                    registrationOpenAt: new Date(this.form.registrationOpenAt),
+                })
+                alert('Session updated successfully!')
+                this.$router.push('/')
+            } catch (error) {
+                console.error('Error updating session:', error)
+                alert('Failed to update session: ' + error.message)
+            } finally {
+                this.saving = false
+            }
+        },
     },
 }
 </script>
 
 <style scoped>
-.form-group label {
-    display: block;
-    margin-bottom: 0.5rem;
-    font-weight: 600;
-    font-size: 0.9rem;
-}
-
-.form-group input {
+.field {
     width: 100%;
-    padding: 0.8rem;
+    padding: 0.75rem;
     background: rgba(255, 255, 255, 0.05);
-    border: 1px solid var(--glass-border);
-    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 0.75rem;
     color: #fff;
     font-family: inherit;
     font-size: 1rem;
+    transition: border-color 0.2s, background 0.2s;
+    color-scheme: dark;
 }
-
-.form-group input:focus {
+.field:focus {
     outline: none;
-    border-color: var(--primary);
+    border-color: #c0ff00;
     background: rgba(255, 255, 255, 0.1);
 }
 
-.admin-view {
-    margin-bottom: 2rem;
+/* Flatpickr accent color overrides */
+:global(.flatpickr-day.selected),
+:global(.flatpickr-day.selected:hover),
+:global(.flatpickr-day.selected:focus) {
+    background: #c0ff00;
+    border-color: #c0ff00;
+    color: #000;
 }
-
-:deep(.dp__theme_dark) {
-    --dp-background-color: var(--bg-dark);
-    --dp-text-color: var(--text-main);
-    --dp-hover-color: var(--bg-card);
-    --dp-hover-text-color: var(--primary);
-    --dp-column-header-text-color: var(--text-muted);
-    --dp-primary-color: var(--primary);
-    --dp-primary-text-color: #000;
-    --dp-secondary-color: var(--glass-border);
-    --dp-border-color: var(--glass-border);
-    --dp-menu-border-color: var(--glass-border);
-    --dp-border-radius: 12px;
+:global(.flatpickr-day:hover),
+:global(.flatpickr-day:focus) {
+    background: rgba(192, 255, 0, 0.15);
+    border-color: transparent;
+    color: #fff;
+}
+:global(.flatpickr-time input:hover),
+:global(.flatpickr-time input:focus),
+:global(.flatpickr-time .flatpickr-am-pm:hover),
+:global(.flatpickr-time .flatpickr-am-pm:focus) {
+    background: rgba(192, 255, 0, 0.1);
+}
+:global(.flatpickr-day.today) {
+    border-color: #c0ff00;
+}
+:global(.flatpickr-day.today:hover) {
+    background: rgba(192, 255, 0, 0.15);
+    color: #fff;
 }
 </style>

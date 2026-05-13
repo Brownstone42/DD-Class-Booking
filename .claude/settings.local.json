@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem *)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Storage\\\\Antigravity\\\\appx\\\\DD-Class-Booking\" -Force | Select-Object Name, @{Name=\"Type\";Expression={if\\($_.PSIsContainer\\){\"DIR\"}else{\"FILE\"}}} | Format-Table -AutoSize)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Storage\\\\Antigravity\\\\appx\\\\DD-Class-Booking\\\\src\" -Force -Recurse | Where-Object {!$_.PSIsContainer} | Select-Object FullName | Sort-Object FullName)",
+      "Bash(mkdir -p \"C:\\\\Users\\\\anawa\\\\.claude\\\\plugins\\\\cache\\\\claude-plugins-official\\\\skill-creator\\\\unknown\\\\skills\\\\booking-feature-workspace\\\\iteration-1\\\\fix-listener-leak\\\\with_skill\\\\outputs\")",
+      "Bash(mkdir -p \"C:\\\\Users\\\\anawa\\\\.claude\\\\plugins\\\\cache\\\\claude-plugins-official\\\\skill-creator\\\\unknown\\\\skills\\\\booking-feature-workspace\\\\iteration-1\\\\fix-listener-leak\\\\without_skill\\\\outputs\")",
+      "Bash(mkdir -p \"C:\\\\Users\\\\anawa\\\\.claude\\\\plugins\\\\cache\\\\claude-plugins-official\\\\skill-creator\\\\unknown\\\\skills\\\\booking-feature-workspace\\\\iteration-1\\\\add-session-notes\\\\with_skill\\\\outputs\")",
+      "Bash(mkdir -p \"C:\\\\Users\\\\anawa\\\\.claude\\\\plugins\\\\cache\\\\claude-plugins-official\\\\skill-creator\\\\unknown\\\\skills\\\\booking-feature-workspace\\\\iteration-1\\\\add-session-notes\\\\without_skill\\\\outputs\")",
+      "Bash(mkdir -p \"C:\\\\Users\\\\anawa\\\\.claude\\\\plugins\\\\cache\\\\claude-plugins-official\\\\skill-creator\\\\unknown\\\\skills\\\\booking-feature-workspace\\\\iteration-1\\\\centralize-admin-emails\\\\with_skill\\\\outputs\")",
+      "Bash(where conda *)",
+      "Bash(where pip *)",
+      "Bash(where pip3 *)",
+      "Bash(npm run *)",
+      "Bash(npm uninstall *)"
+    ]
+  },
+  "enabledPlugins": {
+    "skill-creator@claude-plugins-official": true,
+    "frontend-design@claude-plugins-official": true
+  }
+}
